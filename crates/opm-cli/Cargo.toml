@@ -1,0 +1,20 @@
+[package]
+name = "opm-cli"
+description = "pmctl — command-line front-end for the Open Peripheral Manager"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "pmctl"
+path = "src/main.rs"
+
+[dependencies]
+opm-core = { path = "../opm-core" }
+clap = { version = "4", features = ["derive"] }

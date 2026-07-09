@@ -1,0 +1,8 @@
+edition = "2024"
+use_field_init_shorthand = true
+
+# `imports_granularity` and `group_imports` would be nice additions but
+# are nightly-only rustfmt features as of stable 1.85; the toolchain is
+# pinned to stable (see rust-toolchain.toml), so they're omitted to avoid
+# "unstable feature" warnings on every `cargo fmt` run. Revisit if the
+# project ever adopts nightly rustfmt.

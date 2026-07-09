@@ -1,0 +1,34 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/*",
+    "drivers/*",
+]
+
+# `drivers/*` currently matches nothing — it is reserved so that the first
+# driver crate (e.g. `drivers/opm-driver-ajazz-ak820`) is picked up
+# automatically the moment it is added, with no root Cargo.toml edit.
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/CHANGEME/open-peripheral-manager"
+authors = ["Open Peripheral Manager contributors"]
+
+# Workspace-wide lint configuration. Individual crates opt in with:
+#
+#   [lints]
+#   workspace = true
+#
+# Kept intentionally moderate (clippy::all, not pedantic/nursery) so it
+# stays a helpful guardrail rather than noise while the project — and
+# its author's Rust experience — are both still young. Tighten later via
+# an ADR if desired.
+[workspace.lints.rust]
+unsafe_code = "warn"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

@@ -1,0 +1,17 @@
+[package]
+name = "opm-core"
+description = "Vendor-agnostic core abstractions for the Open Peripheral Manager"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# Intentionally empty for now. `thiserror` will likely be added once
+# `error.rs` grows real variants; transport/HID crates belong in driver
+# crates under `drivers/`, never here. See docs/architecture/overview.md.

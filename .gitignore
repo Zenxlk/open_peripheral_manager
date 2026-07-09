@@ -1,0 +1,16 @@
+/target/
+**/*.rs.bk
+*.pdb
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+
+# OS cruft
+.DS_Store
+
+# Raw USB/HID captures tend to be large binary artifacts; keep the
+# analysis (docs/protocols/**/*.md) in git but not the raw dumps.
+docs/protocols/**/captures/*
+!docs/protocols/**/captures/.gitkeep
