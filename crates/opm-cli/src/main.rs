@@ -21,6 +21,8 @@ struct Cli {
 /// Top-level `pmctl` subcommands.
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Enumerate every HID device on the system, supported or not.
+    Discover,
     /// List detected peripherals.
     List,
     /// Show detailed information about a peripheral.
@@ -35,6 +37,7 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
+        Command::Discover => commands::discover::run(),
         Command::List => commands::list::run(),
         Command::Info => commands::info::run(),
         Command::Rgb => commands::rgb::run(),

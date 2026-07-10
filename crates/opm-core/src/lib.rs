@@ -24,4 +24,5 @@ pub mod capability;
 pub mod device;
 pub mod driver;
 pub mod error;
+pub mod identity;
 pub mod registry;

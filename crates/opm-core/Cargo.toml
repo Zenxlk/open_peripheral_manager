@@ -12,6 +12,7 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
-# Intentionally empty for now. `thiserror` will likely be added once
-# `error.rs` grows real variants; transport/HID crates belong in driver
-# crates under `drivers/`, never here. See docs/architecture/overview.md.
+# General-purpose only — never a transport/HID crate. See
+# docs/architecture/overview.md and ADR 0002. `serde` is needed to
+# serialize `Identity` for `pmctl discover --export`.
+serde = { version = "1", features = ["derive"] }

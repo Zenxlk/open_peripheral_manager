@@ -1,7 +1,9 @@
 # RFC: hardware discovery
 
 Status: Accepted, validated against real hardware (see Findings below);
-the `opm-discovery` crate itself is not implemented yet
+`opm-discovery` and `pmctl discover`'s default output are implemented
+(`crates/opm-discovery`) — `--export`, `--verbose`, and the exit-code
+table are not yet
 
 Date: 2026-07-09
 
@@ -839,6 +841,10 @@ docs/
       Findings.
 - [x] Fill in `docs/inventory/devices.md`'s first row (the AK820) from
       that capture, stamped with the `classified_by` version.
-- [ ] Implement the `opm-discovery` crate for real and wire up
-      `pmctl discover`, with grouping/classification as pure functions
-      per "Testing strategy" above.
+- [x] Implement the `opm-discovery` crate and wire up `pmctl discover`'s
+      default output, with grouping/classification as pure functions per
+      "Testing strategy" above — run against the real AK820, matching
+      the throwaway-script findings exactly (see devlog).
+- [ ] `--export`, `--verbose`, and the exit-code table this document
+      designed — not implemented yet, the default output was the
+      priority to prove the pipeline end-to-end first.

@@ -30,11 +30,11 @@ quality tooling, CI, docs structure. See
 
 ## Phase 1 — Device discovery
 
-**Status: designed and validated against real hardware; crate not
-implemented yet.** How to enumerate and classify HID devices without
-knowing their protocol; design of `pmctl discover`, including its role
-as a shareable report generator for community-driven device support. See
-[`architecture/discovery.md`](architecture/discovery.md),
+**Status: implemented (default output); `--export` and the full CLI
+polish are follow-up work.** How to enumerate and classify HID devices
+without knowing their protocol; design of `pmctl discover`, including
+its role as a shareable report generator for community-driven device
+support. See [`architecture/discovery.md`](architecture/discovery.md),
 [ADR 0002](architecture/decisions/0002-discovery-lives-outside-opm-core.md),
 and [`inventory/`](inventory/).
 
@@ -43,8 +43,13 @@ and [`inventory/`](inventory/).
       `discovery.md`'s heuristics. Every heuristic held up unchanged; see
       `discovery.md`'s Findings section.
 - [x] Record the AK820 in `inventory/devices.md`.
-- [ ] Implement the `opm-discovery` crate for real and wire up
-      `pmctl discover`, including `--export`.
+- [x] Implement the `opm-discovery` crate (`crates/opm-discovery`):
+      `Identity` in `opm-core`, the `hidapi`/`hidreport` adapters,
+      pure grouping/classification with unit tests, and `pmctl discover`
+      wired up and run against the real AK820 (see its devlog entry).
+- [ ] `--export`, `--verbose`, and the exit-code table from
+      `discovery.md` — the default human-readable output works, the
+      rest of the command's designed surface doesn't exist yet.
 
 ## Phase 2 — HID abstraction (Transport)
 

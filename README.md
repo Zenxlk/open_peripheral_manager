@@ -6,8 +6,9 @@ device lives in its own independent driver crate behind a shared
 interface. Development starts with the **Ajazz AK820** keyboard, but the
 AK820 is the first supported device, not the point of the project.
 
-Status: **early scaffolding.** There is no HID communication, no
-protocol implementation, and no working driver yet — see
+Status: **early scaffolding.** `pmctl discover` enumerates and classifies
+HID devices for real (see below) — but there is no protocol
+implementation or working driver yet — see
 [`docs/roadmap.md`](docs/roadmap.md). This repository currently exists to
 get the architecture and tooling right before any device-specific code is
 written.
@@ -24,26 +25,29 @@ learning Rust with an emphasis on doing it properly rather than quickly.
 
 ```
 crates/
-  opm-core/   # library: vendor-agnostic device/driver abstractions
-  opm-cli/    # binary `pmctl`: command-line front-end
-drivers/      # one crate per supported device (empty for now)
-docs/         # architecture decisions, protocol notes, roadmap, devlog
+  opm-core/       # library: vendor-agnostic device/driver abstractions
+  opm-discovery/  # library: HID enumeration/grouping/classification
+  opm-cli/        # binary `pmctl`: command-line front-end
+drivers/          # one crate per supported device (empty for now)
+docs/             # architecture decisions, protocol notes, roadmap, devlog
 ```
 
 See [`docs/architecture/overview.md`](docs/architecture/overview.md) for
 the reasoning behind this layout.
 
-## The eventual CLI
-
-Not implemented yet — subcommands currently only print a placeholder
-message — but the shape is:
+## The CLI
 
 ```
-pmctl list       # detected peripherals
-pmctl info        # details about one
-pmctl rgb          # RGB lighting control
-pmctl profile      # device profile management
+pmctl discover     # every HID device on the system, supported or not — implemented
+pmctl list         # detected, supported peripherals — not implemented yet
+pmctl info         # details about one — not implemented yet
+pmctl rgb          # RGB lighting control — not implemented yet
+pmctl profile      # device profile management — not implemented yet
 ```
+
+`discover` works today: it needs no driver and no protocol knowledge,
+only a connected HID device. See
+[`docs/architecture/discovery.md`](docs/architecture/discovery.md).
 
 ## Building
 

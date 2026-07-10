@@ -129,3 +129,35 @@ and filled in `docs/protocols/ajazz-ak820/README.md`'s previously-empty
 "Hardware identity" section. `docs/roadmap.md` and `discovery.md`'s own
 checklists updated to reflect Phase 1's validation steps as done — only
 implementing the `opm-discovery` crate itself remains.
+
+## Addendum 4, same day: `opm-discovery` implemented, `pmctl discover` works
+
+Wrote the crate for real. `Identity`/`Interface`/`UsagePair` (plain,
+`serde`-derived data, no transport dependency) landed in `opm-core` as
+`identity.rs`, per ADR 0002's corrected dependency direction. The new
+`crates/opm-discovery` holds: a thin `hidapi` adapter (`raw.rs`,
+decoupled into a `RawEntry` type so nothing downstream needs `hidapi`
+itself); the sysfs topology resolver (`topology.rs`, the one impure I/O
+function the grouping algorithm needs); pure `dedupe_by_path` /
+`group_by_topology` / `build_identity` functions (`group.rs`) with unit
+tests built from the real AK820 capture's raw shape; the classification
+heuristic (`classify.rs`) with tests covering each signal combination,
+including the AK820's actual case of the vendor signal living on a
+separate interface from the keyboard signal; report-ID extraction via
+`hidreport` (`descriptor.rs`); and the accessibility check (`accessible.rs`,
+open-then-close, no reads/writes). 10 unit tests, all passing, zero
+`clippy -D warnings` findings, `cargo fmt --check` clean — matching this
+project's CI gates from commit one.
+
+Wired a first `pmctl discover` (default output only — `--export`,
+`--verbose`, and the exit-code table are follow-up work) and ran it
+against the same AK820 Pro. Output matched the earlier throwaway-script
+findings exactly, this time through the real topology-resolution code
+path rather than a hand-fed test fixture: 4 interfaces grouped into one
+device via actual sysfs traversal, classified `Configurable Keyboard`,
+report IDs `[1, 2, 3, 5, 6]` on interface 1. Also correctly enumerated
+and classified two other HID devices already attached to the machine
+(a USB mouse, an I2C touchpad) as `Unknown HID` — the classification
+heuristic's mouse-usage and touchpad case has no dedicated category yet,
+exactly as designed (this document doesn't claim to classify everything,
+only to flag what's plausibly a configurable keyboard).

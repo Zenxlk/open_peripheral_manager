@@ -17,4 +17,5 @@ path = "src/main.rs"
 
 [dependencies]
 opm-core = { path = "../opm-core" }
+opm-discovery = { path = "../opm-discovery" }
 clap = { version = "4", features = ["derive"] }
