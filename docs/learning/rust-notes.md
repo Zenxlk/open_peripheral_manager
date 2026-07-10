@@ -99,3 +99,30 @@ the iterator first (`usage_pairs.clone().any(...)`) solves it cheaply
 here since the iterator only holds references, not owned data, so
 cloning it is just copying a couple of pointers/indices, not the
 underlying data.
+
+## Letting `clap` validate instead of hand-rolling it
+
+`pmctl discover --export <FORMAT>` only supports `json` for now. First
+instinct was `Option<String>` plus a manual `if format != "json" { ... }`
+check. Instead, `ExportFormat` is a small enum deriving
+`clap::ValueEnum` (`commands/discover.rs`), and the field is
+`Option<ExportFormat>`. `clap` then rejects `--export xml` itself, with
+its own usage-error message and exit code (2) — matching
+`discovery.md`'s exit-code table for free, and one less thing to test by
+hand. General lesson: if a CLI flag has a fixed, small set of valid
+values, model it as a type, don't validate a string.
+
+## A hand-rolled date algorithm instead of a date crate
+
+`--export`'s default output filename needs today's date
+(`opm-discover-report-<YYYY-MM-DD>.json`). Pulling in `chrono` or `time`
+for "what's today's UTC date" felt like a lot of dependency for one
+`format!`. Used Howard Hinnant's `civil_from_days` algorithm instead
+(`commands/discover/report.rs`) — a ~15-line, well-known, pure function
+that converts days-since-1970-01-01 into a (year, month, day) triple,
+with the days count coming from
+`SystemTime::now().duration_since(UNIX_EPOCH)`. Worth remembering as a
+pattern: a genuinely small, well-known algorithm can be cheaper than a
+dependency, but it's exactly the kind of code that deserves a unit test
+against known dates (see the `civil_from_days` test) since it's easy to
+get an off-by-one wrong and never notice.

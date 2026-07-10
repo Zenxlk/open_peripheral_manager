@@ -161,3 +161,26 @@ and classified two other HID devices already attached to the machine
 heuristic's mouse-usage and touchpad case has no dedicated category yet,
 exactly as designed (this document doesn't claim to classify everything,
 only to flag what's plausibly a configurable keyboard).
+
+## Addendum 5, same day: `--export`, `--verbose`, exit codes — Phase 1 done
+
+Finished the rest of `pmctl discover`'s designed surface. Split the
+default output down to one line per device (matching `discovery.md`'s
+spec, which the first pass had skipped past); `--verbose`/`-v` now adds
+the per-interface breakdown that used to always print. `--export json`
+writes the full report from `discovery.md`'s draft schema — host context
+(OS/kernel/arch, plus the hardcoded `hidapi_backend` string, since only
+one backend is compiled in right now) plus every device, serial numbers
+redacted unless `--include-serial` is passed. `--output -` for stdout,
+otherwise an auto-named `opm-discover-report-<UTC date>.json`. Exit
+codes: 0 normal, 1 if the HID backend itself fails to init, 2 for bad
+invocation — got the last one for free by making `--export`'s format a
+`clap::ValueEnum` instead of a hand-validated string, so `clap` itself
+rejects `--export xml` with its own usage-error exit code.
+
+Ran every new flag against the real AK820 plus the mouse/touchpad
+already on the machine: default output, `--verbose`, `--export json
+--output -` (verified the JSON matches the hand-built schema example in
+`discovery.md` field-for-field), and the auto-named-file path. All
+correct on the first real run. `docs/roadmap.md` and `discovery.md`'s
+checklists both mark Phase 1 complete as designed.

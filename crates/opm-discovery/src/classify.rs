@@ -23,6 +23,21 @@ pub enum Classification {
     UnknownHid,
 }
 
+impl Classification {
+    /// A stable, machine-readable identifier for this category — used
+    /// by `pmctl discover --export` (see `discovery.md`'s report
+    /// schema). Human-readable labels are a front-end concern, not this
+    /// crate's.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Classification::ConfigurableKeyboard => "configurable_keyboard",
+            Classification::Keyboard => "keyboard",
+            Classification::VendorOnly => "vendor_only",
+            Classification::UnknownHid => "unknown_hid",
+        }
+    }
+}
+
 /// Classifies a device by walking every usage pair declared across all
 /// of its interfaces — regardless of whether those pairs came from
 /// separate interfaces or from multiple top-level collections on the

@@ -1,9 +1,8 @@
 # RFC: hardware discovery
 
-Status: Accepted, validated against real hardware (see Findings below);
-`opm-discovery` and `pmctl discover`'s default output are implemented
-(`crates/opm-discovery`) — `--export`, `--verbose`, and the exit-code
-table are not yet
+Status: Accepted, validated against real hardware (see Findings below),
+fully implemented (`crates/opm-discovery`, `pmctl discover` including
+`--export`/`--verbose`/exit codes)
 
 Date: 2026-07-09
 
@@ -845,6 +844,6 @@ docs/
       default output, with grouping/classification as pure functions per
       "Testing strategy" above — run against the real AK820, matching
       the throwaway-script findings exactly (see devlog).
-- [ ] `--export`, `--verbose`, and the exit-code table this document
-      designed — not implemented yet, the default output was the
-      priority to prove the pipeline end-to-end first.
+- [x] `--export`, `--verbose`, and the exit-code table this document
+      designed — implemented and run against the real AK820 (see
+      devlog). Phase 1 is complete as designed.

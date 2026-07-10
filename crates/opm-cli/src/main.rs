@@ -1,10 +1,11 @@
 //! `pmctl` — command-line front-end for the Open Peripheral Manager.
 //!
-//! This binary is currently a **structural placeholder**: it wires up the
-//! subcommands described in the project README (`list`, `info`, `rgb`,
-//! `profile`) so the shape of the CLI is settled early, but none of them
-//! do real work yet. Behavior will be implemented once `opm-core` exposes
-//! a driver registry to query — see `docs/architecture/driver-model.md`.
+//! `discover` is implemented — see `docs/architecture/discovery.md`.
+//! The rest (`list`, `info`, `rgb`, `profile`) are still structural
+//! placeholders: wired up so the shape of the CLI is settled early, but
+//! none of them do real work yet. Behavior will be implemented once
+//! `opm-core` exposes a driver registry to query — see
+//! `docs/architecture/driver-model.md`.
 
 mod commands;
 
@@ -22,7 +23,7 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Enumerate every HID device on the system, supported or not.
-    Discover,
+    Discover(commands::discover::Args),
     /// List detected peripherals.
     List,
     /// Show detailed information about a peripheral.
@@ -37,7 +38,7 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Discover => commands::discover::run(),
+        Command::Discover(args) => commands::discover::run(args),
         Command::List => commands::list::run(),
         Command::Info => commands::info::run(),
         Command::Rgb => commands::rgb::run(),
