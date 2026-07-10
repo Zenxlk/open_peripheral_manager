@@ -1,6 +1,7 @@
 # RFC: hardware discovery
 
-Status: Proposed (design only — nothing in this document is implemented)
+Status: Accepted, validated against real hardware (see Findings below);
+the `opm-discovery` crate itself is not implemented yet
 
 Date: 2026-07-09
 
@@ -646,6 +647,74 @@ Conclusion / what changes as a result:
 ...
 ```
 
+## Findings
+
+### 2026-07-09 — Ajazz AK820 (Pro) — first real capture
+
+Command run: throwaway `hidapi` + `hidreport` probe scripts (`opm-discovery`
+doesn't exist yet).
+Capture: [`docs/inventory/captures/ajazz-ak820-2026-07-09.json`](../inventory/captures/ajazz-ak820-2026-07-09.json)
+
+**What was expected:** a keyboard interface (usage 0x01/0x06) plus at
+least one vendor-defined interface (0xFF00–0xFFFF), classifying as
+`Configurable Keyboard`; grouping to rely on topology since serial was
+expected to be unreliable; `hidreport` to parse the descriptor cleanly.
+
+**What was observed:** confirmed, and richer than predicted.
+
+- 4 hidraw interfaces (0-3), all sharing one sysfs parent USB device
+  (`.../usb3/3-1`) — topology-based grouping worked exactly as designed.
+- Interface 0: single collection, usage `0x01/0x06` (keyboard), no
+  report ID.
+- **Interface 1 alone declares five top-level usage pairs** sharing one
+  `hidapi` `path`/`interface_number` — richer than the "an interface with
+  two collections" case this document anticipated: `0x0c/0x01`
+  (consumer), `0x01/0x80` (system control), `0x01/0x06` (a *second*
+  keyboard usage, distinct from interface 0's), `0x01/0x02` (mouse!), and
+  `0xffff/0x01` (vendor). It multiplexes 5 distinct report IDs
+  (`1,2,3,5,6`) across those.
+- Interfaces 2 and 3 are each a single, dedicated vendor-defined usage
+  pair (`0xff68/0x61` and `0xff13/0x01` respectively) — i.e. **three**
+  vendor usage pages across this device (one shared with interface 1,
+  two standalone), not the single vendor channel the design's examples
+  implied. Likely separate command channels (macros/RGB/profiles?) —
+  irrelevant to discovery, a Phase 6 question.
+- Classification: `Configurable Keyboard` (signals 1 + 3 both present).
+  **Matches prediction.**
+- `serial_number` was `Some("")` — present but empty, a third case
+  beyond the plain "absent vs. present" this document discussed.
+  Functionally equivalent to absent for grouping purposes: it does
+  **not** contradict the decision to group by topology rather than
+  serial, if anything it reinforces it (an empty string is an even more
+  obvious collision risk across units than a hardcoded non-empty one).
+- `manufacturer_string` was `"SONiX"`, not `"Ajazz"` — confirms the
+  manufacturer-identification finding exactly as reasoned: VID `0x0c45`
+  and the device's own string both resolve to the OEM controller vendor
+  (Sonix Technology), not the brand printed on the keyboard. VID/PID
+  alone will not be a safe "is this an Ajazz product" signal if Sonix
+  ships the same controller under other brands.
+- `/dev/hidraw0`-`3` were all `root:root`, mode `0600` — opening any of
+  them as the logged-in user failed with permission denied, no udev rule
+  installed on this machine. Confirms the accessibility-check design
+  (report "detected, not accessible" rather than fail) reflects a real,
+  common, out-of-the-box condition, not a hypothetical.
+- `hidreport` parsed all four descriptors without error on the first
+  try. One parsing-script caveat, not a finding about the hardware: a
+  naive walk of *every* collection attached to a field (rather than only
+  top-level `Application` collections) also surfaces nested `Logical`
+  collections (e.g. a `Pointer` usage nested inside interface 1's
+  `Mouse` collection) — `opm-discovery`'s real implementation must
+  filter to top-level collections specifically to match what `hidapi`
+  itself reports, or grouping/classification will see phantom extra
+  usage pairs.
+
+**Conclusion:** every heuristic and algorithm decision in this document
+held up against real hardware unchanged. No revision needed to the
+grouping strategy, the classification signals, or the dependency
+choices (`hidapi` 2.x/`linux-static-hidraw`, `hidreport`/`hut`). The one
+implementation note worth carrying forward: filter to top-level
+collections only when walking `hidreport`'s output.
+
 ## Folder structure introduced by this phase
 
 ```
@@ -662,18 +731,21 @@ docs/
 
 ## Risks and open questions
 
-- **Grouping is now a concrete algorithm (topology-first, see above), but
-  it's still unvalidated against real hardware.** The dedupe-by-path +
-  sysfs-parent-topology approach should handle the common cases
-  (missing serial, duplicated serial, multiple top-level collections on
-  one interface) without guessing — but it's only ever been reasoned
-  about, not run. Confirming it against the AK820, and ideally a second,
-  unrelated device plugged in at the same time, is next phase's job.
-- **Gray-market VID/PID reuse.** If the AK820 turns out to share a VID
-  with unrelated products from the same OEM controller vendor, VID
-  alone can never be a matching key for `Driver::probe()` — PID, and
-  possibly `release_number` or interface topology, would have to do more
-  work than usual. Unknown until checked.
+- **Grouping's topology-first algorithm is confirmed against the AK820
+  (see Findings) but only with one physical unit connected.** The one
+  scenario it was specifically designed for and still hasn't been
+  observed — two identical units, sharing an identical empty/hardcoded
+  serial, plugged in at once, correctly grouped as two devices via
+  topology rather than merged — needs a second unit to actually test.
+- **Gray-market VID/PID reuse — confirmed as a real, not hypothetical,
+  concern.** `manufacturer_string` reports `"SONiX"` (the OEM controller
+  vendor), not `"Ajazz"`, and VID `0x0c45` is registered to Sonix
+  Technology, not Ajazz. If some other rebrand of the same Sonix
+  controller shares this exact VID:PID, VID/PID alone can never be a
+  safe matching key for `Driver::probe()` — `release_number`, the exact
+  set of four interfaces and their usage pairs, or product-string
+  matching would have to do more work than usual. Still unknown; would
+  need a second Sonix-based keyboard to actually check.
 - **hidapi backend and dependency pins need to survive upgrades.** The
   design now names concrete choices (`hidapi` 2.x /
   `linux-static-hidraw`, `hidreport`/`hut` for descriptor parsing) rather
@@ -722,13 +794,10 @@ docs/
 - [ADR 0002](decisions/0002-discovery-lives-outside-opm-core.md).
 - `docs/inventory/` (README, `devices.md`, empty `captures/`).
 - Updated `docs/roadmap.md` and `docs/README.md` reflecting the above.
-
-No hardware has been probed yet, so there is no empirical evidence in
-this document — only the reasoning that `hidapi`/HID/USB's own public
-specs and the AK820's total absence of documentation makes possible in
-advance. The evidence phase starts once the AK820 is physically available
-and `pmctl discover` (or a throwaway script standing in for it) actually
-runs against it.
+- The first real capture,
+  [`docs/inventory/captures/ajazz-ak820-2026-07-09.json`](../inventory/captures/ajazz-ak820-2026-07-09.json),
+  and its row in `docs/inventory/devices.md` — the empirical evidence
+  this document didn't have when first written (see Findings).
 
 ## Conclusions
 
@@ -759,15 +828,17 @@ runs against it.
 
 ## Next steps (feed into `docs/roadmap.md`)
 
-- [ ] Get the AK820 enumerating via `hidapi` (a throwaway script is
+- [x] Get the AK820 enumerating via `hidapi` (a throwaway script is
       enough — doesn't need to be `pmctl discover` yet) and capture the
       raw output. This is the first real test of every heuristic above,
-      including the newly-concrete grouping algorithm.
-- [ ] Confirm the `hidapi` 2.x / `linux-static-hidraw` pin behaves as
+      including the newly-concrete grouping algorithm. See Findings.
+- [x] Confirm the `hidapi` 2.x / `linux-static-hidraw` pin behaves as
       documented on the maintainer's actual Linux distro/kernel, and that
-      `hidreport` parses the AK820's real report descriptor cleanly.
-- [ ] Fill in `docs/inventory/devices.md`'s first row (the AK820) from
+      `hidreport` parses the AK820's real report descriptor cleanly. Both
+      confirmed; note the top-level-collections-only filtering caveat in
+      Findings.
+- [x] Fill in `docs/inventory/devices.md`'s first row (the AK820) from
       that capture, stamped with the `classified_by` version.
-- [ ] Only after the above: implement the discovery crate for real and
-      wire up `pmctl discover`, with grouping/classification as pure
-      functions per "Testing strategy" above.
+- [ ] Implement the `opm-discovery` crate for real and wire up
+      `pmctl discover`, with grouping/classification as pure functions
+      per "Testing strategy" above.

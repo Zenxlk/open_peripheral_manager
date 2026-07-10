@@ -95,3 +95,37 @@ minimizing dependencies for its own sake:
 
 `docs/architecture/domain-model.md` and `overview.md` updated to match
 throughout.
+
+## Addendum 3, same day: first real hardware, AK820 Pro in hand
+
+The maintainer's AK820 Pro was connected, so ran the design's own
+prescribed "next step" before touching `opm-discovery`'s real
+implementation: two throwaway scripts (`hidapi::device_list()`, then
+`hidreport::ReportDescriptor::try_from()` against the raw sysfs
+`report_descriptor` bytes), kept outside the repo, in the scratch
+directory — not committed, per the design's "throwaway script is
+enough" framing.
+
+Result: every design decision held up unchanged against real hardware.
+4 hidraw interfaces sharing one sysfs-topology parent (confirming
+topology-first grouping); interface 1 alone declaring five top-level
+usage pairs sharing one `hidapi` path (confirming, and exceeding, the
+predicted multi-collection-per-interface case); three distinct
+vendor-defined usage pages total; classification landed on
+`Configurable Keyboard` exactly as predicted; `serial_number` was
+`Some("")` rather than `None` — an unanticipated third case, but one
+that only reinforces the decision to not group by serial;
+`manufacturer_string` reported `"SONiX"` (the OEM chip vendor) rather
+than `"Ajazz"`, confirming the gray-market-VID concern was real, not
+hypothetical; and all four `/dev/hidraw*` nodes were root-only with no
+udev rule installed on this machine, confirming the accessibility-check
+design reflects a real out-of-the-box condition.
+
+Wrote this up as `discovery.md`'s first "Findings" entry, saved the
+capture to `docs/inventory/captures/ajazz-ak820-2026-07-09.json` (hand-
+built against the draft `--export` schema, since the real command
+doesn't exist yet), filled in `docs/inventory/devices.md`'s first row,
+and filled in `docs/protocols/ajazz-ak820/README.md`'s previously-empty
+"Hardware identity" section. `docs/roadmap.md` and `discovery.md`'s own
+checklists updated to reflect Phase 1's validation steps as done — only
+implementing the `opm-discovery` crate itself remains.

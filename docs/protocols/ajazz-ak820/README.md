@@ -23,5 +23,33 @@ directory exists so the process has a home from day one.
 
 ## Hardware identity
 
-To be filled in once the device is in hand (USB vendor id / product id,
-interface count, HID report descriptor).
+Captured via a throwaway `hidapi`/`hidreport` probe (see
+[`docs/architecture/discovery.md`](../../architecture/discovery.md)'s
+Findings section for the full analysis; raw report descriptors are not
+yet in this directory's `captures/` — only the discovery-level JSON
+report lives in
+[`docs/inventory/captures/ajazz-ak820-2026-07-09.json`](../../inventory/captures/ajazz-ak820-2026-07-09.json)).
+
+- USB VID:PID: `0x0c45:0x800a` (`0x0c45` is Sonix Technology — the OEM
+  controller vendor, not Ajazz; `manufacturer_string`/`product_string`
+  report `"SONiX"`/`"AK820"`, not the Ajazz brand).
+- 4 HID interfaces on one composite USB device:
+  - Interface 0 — boot-protocol keyboard only (`usage 0x01/0x06`).
+  - Interface 1 — five top-level usage pairs sharing one interface:
+    consumer control (`0x0c/0x01`), system control (`0x01/0x80`), a
+    second keyboard usage (`0x01/0x06`), mouse (`0x01/0x02`), and a
+    vendor-defined channel (`0xffff/0x01`); multiplexes report IDs
+    `1, 2, 3, 5, 6`.
+  - Interface 2 — dedicated vendor channel, `usage 0xff68/0x61`.
+  - Interface 3 — dedicated vendor channel, `usage 0xff13/0x01`.
+- No usable serial number (`Some("")`, empty string).
+- `/dev/hidraw0`-`3` are root-only by default on a stock Arch install —
+  actual protocol work against this device will need a udev rule, not
+  just discovery-level enumeration (which needs no permissions at all).
+
+Three distinct vendor usage pages (one shared with interface 1, two
+dedicated) is the headline surprise here — likely separate command
+channels for different features. Which one does what (RGB? macros?
+profiles?) is exactly what the reverse-engineering pass into this
+directory (Phase 6, not yet started) needs to answer; discovery
+deliberately stops before that.
