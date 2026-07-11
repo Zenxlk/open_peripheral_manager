@@ -7,7 +7,9 @@
   `Protocol`) every later phase builds on.
   [`architecture/discovery.md`](architecture/discovery.md) designs how
   hardware is found and classified, before any protocol work starts.
-  Design decisions with lasting consequences are recorded as ADRs in
+  [`architecture/transport.md`](architecture/transport.md) designs how
+  bytes actually move once a device is opened. Design decisions with
+  lasting consequences are recorded as ADRs in
   [`architecture/decisions/`](architecture/decisions/).
 - [`inventory/`](inventory/) — a shallow, cross-device catalog: every
   physical device ever run through discovery, supported or not. See

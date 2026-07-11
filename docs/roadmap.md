@@ -49,14 +49,25 @@ and [`inventory/`](inventory/).
 
 ## Phase 2 — HID abstraction (Transport)
 
-**Status: not started, not yet designed.** A vendor-agnostic Rust
-abstraction over the OS's HID layer (open/read/write, on top of whatever
-the discovery crate already uses to enumerate) that driver crates depend
-on instead of every driver calling `hidapi` directly. Deliberately
-designed *after* Phase 1 is validated against real hardware, so its
-shape is informed by what discovery actually needed and what opening/
-writing to a real device actually requires — not guessed at in advance.
-No document yet; gets its own architecture doc when its turn comes.
+**Status: fully implemented** as designed in `transport.md`. See
+[`architecture/transport.md`](architecture/transport.md) and
+[ADR 0003](architecture/decisions/0003-transport-trait-in-core-impl-in-opm-transport.md):
+a `Transport` trait (Input/Output/Feature reports, per-interface, no
+`hidapi` dependency) lives in `opm-core`; a `hidapi`-backed
+implementation lives in the new `opm-transport` crate.
+
+- [x] Design the trait against Phase 1's real, validated `Identity`
+      shape and `hidapi` 2.6.6's actual API — see `transport.md`.
+- [x] Implement `opm_core::transport` (trait, `Error`, `ReadTimeout`).
+- [x] Implement `opm-transport`'s `HidTransport`. 0 `clippy -D warnings`
+      findings, `cargo fmt --check` clean, matching every other crate's
+      gates.
+- [x] Open a real AK820 interface and exchange a first report. Needed a
+      udev rule (`TAG+="uaccess"`) first — the exact permission gap
+      `discovery.md` predicted, confirmed then unblocked. A `get_feature`
+      round trip against interface 3 (`/dev/hidraw4`, one of the AK820's
+      vendor channels) succeeded for real. See `transport.md`'s Findings
+      and the 2026-07-10 devlog.
 
 ## Phase 3 — Driver system
 

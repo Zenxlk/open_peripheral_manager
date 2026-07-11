@@ -10,6 +10,7 @@ open-peripheral-manager/
 ├── crates/
 │   ├── opm-core/       # library: traits + registry every front-end depends on
 │   ├── opm-discovery/  # library: HID enumeration/grouping/classification (see discovery.md)
+│   ├── opm-transport/  # library: hidapi-backed Transport impl (see transport.md; not yet implemented)
 │   └── opm-cli/        # binary `pmctl`: thin CLI front-end
 ├── drivers/
 │   └── opm-driver-<vendor>-<model>/   # one crate per device (none yet)
@@ -53,6 +54,20 @@ it. See [`discovery.md`](discovery.md) and
 this is a separate crate rather than living inside `opm-core` or
 `opm-cli` directly.
 
+### `opm-transport`
+
+Opens one HID interface (by the `path` a discovered `Identity::Interface`
+carries) and exchanges Input/Output/Feature reports with it — the layer
+driver crates use instead of calling `hidapi` directly for real I/O, as
+opposed to `opm-discovery`'s enumeration-only, never-opens-for-I/O role.
+Implements the `Transport` trait `opm-core` defines
+(`opm-core::transport`), the same dependency direction ADR 0002
+established for `Identity`: the trait lives in `opm-core`, transport-
+library-free; `opm-transport` depends on `opm-core` and `hidapi`, not the
+reverse. See [`transport.md`](transport.md) and
+[ADR 0003](decisions/0003-transport-trait-in-core-impl-in-opm-transport.md).
+Designed, not yet implemented.
+
 ### `opm-cli`
 
 The `pmctl` binary. Exists as a separate crate — not folded into
@@ -81,12 +96,9 @@ for the rationale and naming convention.
   like `opm-cli` does, likely living at `crates/opm-gui` once a toolkit
   (egui? Tauri? iced?) is chosen — a decision to make when there's
   actually a `Device` trait to build a UI around, not before.
-- **A general driver-side transport crate.** `opm-discovery` only
-  enumerates — it never opens a device for sustained I/O. Whether driver
-  crates get a shared "open and read/write HID reports" abstraction (a
-  `Transport` crate/trait — see `domain-model.md`), or each driver talks
-  to `hidapi` directly, is still an open question for Phase 2, deliberately
-  not answered by `opm-discovery` existing.
+- **`opm-transport`'s actual code.** The crate is now designed (see
+  above, `transport.md`, ADR 0003) but not yet implemented — Phase 2 is
+  design-complete, not code-complete.
 - **`opm-driver-api`.** If, once a second real driver exists, `opm-core`
   feels too heavy a dependency just to get at the `Driver`/`Device`
   traits, consider extracting those traits into a smaller crate that

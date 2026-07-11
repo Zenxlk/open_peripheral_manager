@@ -35,3 +35,16 @@ once it has a first release.
     (`Identity`, `Transport`, `Capabilities`, `Driver`, `Protocol`)
     every driver crate will need, and how the roadmap's phases map onto
     them.
+- Phase 2 (HID transport), designed in `docs/architecture/transport.md`
+  and validated against the real Ajazz AK820 Pro:
+  - `Transport` trait, `Error`, and `ReadTimeout` in `opm-core`
+    (`transport.rs`), transport-library-free per
+    [ADR 0003](docs/architecture/decisions/0003-transport-trait-in-core-impl-in-opm-transport.md).
+  - New `opm-transport` crate: `HidTransport`, a `hidapi`-backed
+    implementation opening one HID interface at a time and exchanging
+    Input/Output/Feature reports with it.
+  - Ran a real `get_feature` round trip against the AK820's vendor
+    configuration channel (interface 3, `/dev/hidraw4`) after installing
+    a udev rule (`TAG+="uaccess"`) to grant access — the first confirmed
+    real I/O exchange with the device's proprietary channel, and the
+    permission gap `discovery.md` had already documented as expected.

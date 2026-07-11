@@ -36,7 +36,7 @@ Device
 | Facet | Question it answers | Owning phase | Owning document | Public in `opm-core`? |
 |---|---|---|---|---|
 | **Identity** | Vendor, product, serial, human-readable name, *and* declared interface topology (usage pages/usages, report-ID counts) — enough for a `Driver` to decide "this is mine" without opening anything | Phase 1 (Discovery) | `discovery.md` | Yes — defined in `opm-core` itself (see [ADR 0002](decisions/0002-discovery-lives-outside-opm-core.md)); the discovery crate depends on `opm-core` to produce it, using `hidapi` internally |
-| **Transport** | How bytes actually move: HID over USB today, conceivably HID over Bluetooth or something else later | Phase 2 | not yet written | Yes, as a trait/abstraction — but its shape is undesigned |
+| **Transport** | How bytes actually move: HID over USB today, conceivably HID over Bluetooth or something else later | Phase 2 | `transport.md` | Yes — the `Transport` trait, defined in `opm-core` (see [ADR 0003](decisions/0003-transport-trait-in-core-impl-in-opm-transport.md)); the `hidapi`-backed implementation lives in `opm-transport`, using `hidapi` internally |
 | **Capabilities** | The optional feature surface a `Device` exposes (RGB, profiles, battery, ...) | Phase 3 | `driver-model.md` | Yes — the capability trait pattern |
 | **Driver** | The matcher/factory: given an `Identity`, decides "mine", opens a `Transport`, returns a `Device` with some `Capabilities` | Phase 3 | `driver-model.md` | Yes — the `Driver` trait and `DriverRegistry` |
 | **Protocol** | The vendor-specific byte-level meaning of reports sent/received over a `Transport` — how a `Capability` is actually implemented for one device | Phase 6 | `docs/protocols/<vendor>-<model>/` | **No** — internal to each driver crate, never exposed outside it |
@@ -63,8 +63,8 @@ and only last, `Protocol` — filling in what the stubs actually do.
 
 ## Non-goals of this document
 
-- Designing `Transport`'s actual API (Phase 2's job, deliberately not
-  started — see `roadmap.md`).
+- Designing `Transport`'s actual API in depth — that's `transport.md`'s
+  job (Phase 2, now designed; see there for the trait itself).
 - Finalizing the `Capability` mechanism (`dyn Any` downcasting vs. an
   accessor per known trait vs. `downcast-rs`) — still open, see
   `driver-model.md`.
