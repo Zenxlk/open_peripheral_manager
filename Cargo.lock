@@ -195,6 +195,7 @@ dependencies = [
  "clap",
  "opm-core",
  "opm-discovery",
+ "opm-driver-ajazz-ak820",
  "serde",
  "serde_json",
 ]

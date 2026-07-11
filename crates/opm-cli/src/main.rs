@@ -1,11 +1,11 @@
 //! `pmctl` — command-line front-end for the Open Peripheral Manager.
 //!
-//! `discover` is implemented — see `docs/architecture/discovery.md`.
-//! The rest (`list`, `info`, `rgb`, `profile`) are still structural
-//! placeholders: wired up so the shape of the CLI is settled early, but
-//! none of them do real work yet. Behavior will be implemented once
-//! `opm-core` exposes a driver registry to query — see
-//! `docs/architecture/driver-model.md`.
+//! `discover` (Phase 1) and `list`/`info`/`rgb`/`profile` (Phase 5) are
+//! all implemented, backed by an explicit `DriverRegistry` — see
+//! `commands::registry` and `docs/architecture/driver-model.md`. `rgb`/
+//! `profile` always fail against every driver that exists today, since
+//! `opm-driver-ajazz-ak820`'s capabilities are still Phase 6 stubs (see
+//! `docs/roadmap.md`) — that's expected, not a bug in this wiring.
 
 mod commands;
 
@@ -24,14 +24,14 @@ struct Cli {
 enum Command {
     /// Enumerate every HID device on the system, supported or not.
     Discover(commands::discover::Args),
-    /// List detected peripherals.
+    /// List peripherals recognized by a registered driver.
     List,
     /// Show detailed information about a peripheral.
-    Info,
+    Info(commands::info::Args),
     /// Configure RGB lighting.
-    Rgb,
+    Rgb(commands::rgb::Args),
     /// Manage device profiles.
-    Profile,
+    Profile(commands::profile::Args),
 }
 
 fn main() {
@@ -40,8 +40,8 @@ fn main() {
     match cli.command {
         Command::Discover(args) => commands::discover::run(args),
         Command::List => commands::list::run(),
-        Command::Info => commands::info::run(),
-        Command::Rgb => commands::rgb::run(),
-        Command::Profile => commands::profile::run(),
+        Command::Info(args) => commands::info::run(args),
+        Command::Rgb(args) => commands::rgb::run(args),
+        Command::Profile(args) => commands::profile::run(args),
     }
 }
