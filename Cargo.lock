@@ -218,6 +218,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "opm-driver-ajazz-ak820"
+version = "0.1.0"
+dependencies = [
+ "opm-core",
+ "opm-transport",
+]
+
+[[package]]
 name = "opm-transport"
 version = "0.1.0"
 dependencies = [
