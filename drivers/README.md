@@ -1,10 +1,15 @@
 # Drivers
 
 This directory holds one Cargo crate per supported manufacturer/device
-combination. It is currently empty — no driver has been written yet — but
-it is already wired into the workspace (`drivers/*` in the root
-`Cargo.toml`) so the first driver crate is picked up automatically the
-moment it's added, no root `Cargo.toml` edit required.
+combination. It is wired into the workspace (`drivers/*` in the root
+`Cargo.toml`), so a new driver crate is picked up automatically, no root
+`Cargo.toml` edit required.
+
+`opm-driver-ajazz-ak820` is the first one (Phase 4, see
+`docs/roadmap.md`): matches the real AK820, opens its vendor `Transport`,
+exposes `Rgb`/`Profiles` — with stub implementations, since no protocol
+reverse-engineering (Phase 6) has happened yet. Not linked into `pmctl`
+yet either (Phase 5).
 
 ## Why a crate per device (and not one big `drivers` crate)
 
@@ -25,13 +30,15 @@ moment it's added, no root `Cargo.toml` edit required.
 drivers/opm-driver-ajazz-ak820/
 ```
 
-## Expected shape of a driver crate (for later, not implemented yet)
+## Shape of a driver crate
 
-- Depends on `opm-core` and implements its `Driver`/`Device` traits.
-- Contains all HID/USB transport and protocol-specific logic for that one
-  device — none of that belongs in `opm-core`.
+- Depends on `opm-core` (for the `Driver`/`Device`/`Capability` traits)
+  and `opm-transport` (to actually open a device) — see
+  `opm-driver-ajazz-ak820/Cargo.toml`.
+- Contains all HID/USB transport-usage and protocol-specific logic for
+  that one device — none of that belongs in `opm-core`.
 - Ships its own protocol notes under
   `docs/protocols/<vendor>-<model>/`.
 
-See `docs/architecture/driver-model.md` for the (not yet finalized) design
-of the traits a driver crate will need to implement.
+See `docs/architecture/driver-model.md` for the design of the traits a
+driver crate implements.

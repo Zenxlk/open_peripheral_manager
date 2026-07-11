@@ -59,3 +59,16 @@ once it has a first release.
     keyboard with RGB+profiles, a headset with only battery): 5 unit
     tests, all passing. No real driver crate exists yet — that's
     Phase 4.
+- Phase 4 (first driver): `drivers/opm-driver-ajazz-ak820`, the first
+  real `Driver`/`Device` implementation, validated against the real
+  Ajazz AK820 Pro:
+  - `AjazzAk820Driver` matches the real VID:PID and opens the vendor
+    interface confirmed reachable in Phase 2 (`0xff13/0x01`).
+  - `AjazzAk820Device` exposes `Rgb`/`Profiles` (not `Battery` — wired
+    keyboard); every capability method is a stub returning
+    `Error::Driver`, except `get_color()`, which does a real read-only
+    `get_feature` round trip first to prove the transport stays alive.
+  - Ran the whole chain for real: `opm-discovery` → `DriverRegistry`
+    (matches only the AK820 among the machine's other HID devices) →
+    a real `HidTransport::open` → capability stubs. Not yet linked into
+    `pmctl` (Phase 5). 5 unit tests, all passing, no hardware required.

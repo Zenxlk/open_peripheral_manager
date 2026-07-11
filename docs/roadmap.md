@@ -92,14 +92,31 @@ driver crate declares "I can handle this `Identity`" and hands back a
 
 ## Phase 4 — First driver (Ajazz AK820)
 
-**Status: not started, unblocked — phases 1-3 are done.** Build
-`drivers/opm-driver-ajazz-ak820` against the real traits: match its
-`Identity`, open its `Transport`, expose whatever `Capabilities` are
-anticipated for it — even before those capabilities do anything real.
-The goal of this phase is proving the architecture end-to-end for one
-device (discovery → transport → driver → capability shape), *before*
-any protocol reverse-engineering. Capability implementations are
-expected to be stubs/no-ops at the end of this phase.
+**Status: fully implemented, validated against real hardware.**
+`drivers/opm-driver-ajazz-ak820` (`AjazzAk820Driver`/`AjazzAk820Device`)
+matches the real AK820's `Identity`, opens its vendor `Transport`, and
+exposes `Rgb`/`Profiles` (not `Battery` — wired keyboard) with stub
+implementations, per this phase's original goal.
+
+- [x] `probe()` matches the real VID:PID (`0x0c45:0x800a`); `open()`
+      finds and opens the vendor interface confirmed reachable in
+      Phase 2 (usage `0xff13/0x01`, `/dev/hidraw4`). 5 unit tests
+      (no hardware needed) cover `probe`/`open`'s error path.
+- [x] Ran the real thing: `opm-discovery` → `DriverRegistry::find` (only
+      matches the AK820, not the mouse/touchpad also on the machine) →
+      `DriverRegistry::open` (a real `HidTransport::open` against
+      `/dev/hidraw4`) → `rgb()`/`profiles()` return `Some`, `battery()`
+      returns `None` → `get_color()` does a real, already-validated
+      `get_feature(0, ..)` read (proving the transport stays alive) then
+      correctly reports "protocol unknown" rather than fabricating a
+      color. See the 2026-07-10 devlog.
+- Known gaps, carried forward rather than silently accepted: VID:PID
+  matching alone can't rule out a different Sonix-based rebrand sharing
+  `0x0c45:0x800a`; only one of the AK820's three vendor usage pages is
+  opened (interfaces 1's shared `0xffff/0x01` and 2's `0xff68/0x61` are
+  unused — Phase 6 may need them too); `pmctl` doesn't link this driver
+  crate yet, so `pmctl discover`'s own "unsupported" output is still
+  accurate until Phase 5 wires it in.
 
 ## Phase 5 — CLI
 
