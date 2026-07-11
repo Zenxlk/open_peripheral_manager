@@ -1,10 +1,21 @@
-//! Will hold the top-level `Error` type shared across `opm-core`'s public
-//! API. Individual driver crates will likely define their own, more
-//! specific error types and convert into this one at the `Driver`/`Device`
-//! trait boundary.
-//!
-//! `thiserror` is the natural fit here once this has real variants; it is
-//! intentionally not yet a dependency of this crate.
-//!
-//! Not yet designed — start here when you're ready to design error
-//! handling.
+//! The top-level `Error` type shared across `Driver`/`Device`/
+//! `Capability`. See `docs/architecture/driver-model.md`'s
+//! `opm_core::error::Error` section for the design.
+
+/// Everything that can go wrong probing, opening, or using a device
+/// through `opm-core`'s traits.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    /// No registered driver's [`crate::driver::Driver::probe`]
+    /// recognized this [`crate::identity::Identity`].
+    #[error("no registered driver recognizes this device")]
+    Unsupported,
+    /// A [`crate::transport::Transport`] operation failed while opening
+    /// or using a device.
+    #[error(transparent)]
+    Transport(#[from] crate::transport::Error),
+    /// A driver-specific failure not covered by [`Error::Transport`]
+    /// (e.g. a response the driver can parse enough to reject).
+    #[error("{0}")]
+    Driver(String),
+}

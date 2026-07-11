@@ -1,10 +1,35 @@
-//! Will hold the `Device` trait: a handle to an already-open, communicating
-//! peripheral, independent of vendor and transport.
+//! The `Device` trait: a handle to an already-open, communicating
+//! peripheral, independent of vendor and transport. See
+//! `docs/architecture/driver-model.md`'s "`Device`: identity plus
+//! capability accessors".
 //!
-//! A `Device` is what a driver's `open()` call is expected to hand back to
-//! the caller (see [`crate::driver`]). Front-ends such as `opm-cli` will
-//! interact with a device exclusively through this trait, plus whichever
-//! optional capability traits (see [`crate::capability`]) the concrete
-//! device chooses to expose.
-//!
-//! Not yet designed — start here when you're ready to design the trait.
+//! Returned by [`crate::driver::Driver::open`]. Front-ends interact with
+//! a device exclusively through this trait plus whichever optional
+//! capability traits ([`crate::capability`]) it chooses to expose.
+
+use crate::capability::{Battery, Profiles, Rgb};
+use crate::identity::Identity;
+
+/// A live handle to an opened peripheral.
+///
+/// Every accessor defaults to `None`, so a concrete `Device` only
+/// overrides the ones it actually supports — see `driver-model.md` for
+/// why this shape was chosen over `dyn Any` downcasting.
+pub trait Device: Send {
+    /// What this device is — the same [`Identity`] its [`crate::driver::Driver`]
+    /// matched.
+    fn identity(&self) -> &Identity;
+
+    /// `Some` if this device supports RGB lighting control.
+    fn rgb(&self) -> Option<&dyn Rgb> {
+        None
+    }
+    /// `Some` if this device reports a battery level.
+    fn battery(&self) -> Option<&dyn Battery> {
+        None
+    }
+    /// `Some` if this device supports switching between stored profiles.
+    fn profiles(&self) -> Option<&dyn Profiles> {
+        None
+    }
+}

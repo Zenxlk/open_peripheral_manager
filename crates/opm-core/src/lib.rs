@@ -16,12 +16,11 @@
 //! - Any vendor- or model-specific protocol logic (belongs in a driver
 //!   crate under `drivers/`).
 //!
-//! The modules below are placeholders. Their real design — the `Device`
-//! and `Driver` traits, the driver registry, and the capability-detection
-//! pattern used for optional features such as RGB lighting or profile
-//! switching — is tracked in `docs/architecture/driver-model.md` and is
-//! deliberately left for later, hands-on design work rather than decided
-//! upfront here.
+//! [`driver`]/[`device`]/[`capability`]/[`registry`] hold the `Driver`,
+//! `Device`, and capability traits, and `DriverRegistry` — see
+//! `docs/architecture/driver-model.md` for the design. No real driver
+//! crate exists yet (Phase 4); these traits are validated in
+//! [`registry`]'s tests against fake, in-memory devices.
 
 pub mod capability;
 pub mod device;
