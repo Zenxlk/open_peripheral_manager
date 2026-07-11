@@ -1,0 +1,22 @@
+[package]
+name = "opm-transport"
+description = "hidapi-backed Transport implementation for the Open Peripheral Manager"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+opm-core = { path = "../opm-core" }
+# Pinned explicitly (not just relying on the crate's own default) per
+# docs/architecture/discovery.md: the hidraw backend is required on
+# Linux for HID I/O to work through the kernel's HID driver rather than
+# detaching it. Kept consistent with opm-discovery's pin.
+hidapi = { version = "2", default-features = false, features = [
+    "linux-static-hidraw",
+] }

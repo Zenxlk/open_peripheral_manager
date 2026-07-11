@@ -8,8 +8,11 @@
 //!
 //! Deliberately **out of scope** for this crate, now and for the
 //! foreseeable future:
-//! - HID/USB transport and device enumeration (belongs in a future
-//!   transport crate or in individual driver crates).
+//! - Actually talking to a transport library (`hidapi`, `libusb`, ...).
+//!   [`transport`] defines the `Transport` *trait* only — the
+//!   `hidapi`-backed implementation lives in `opm-transport` (see
+//!   `docs/architecture/transport.md`, ADR 0003). Device enumeration
+//!   similarly lives in `opm-discovery` (ADR 0002).
 //! - Any vendor- or model-specific protocol logic (belongs in a driver
 //!   crate under `drivers/`).
 //!
@@ -26,3 +29,4 @@ pub mod driver;
 pub mod error;
 pub mod identity;
 pub mod registry;
+pub mod transport;

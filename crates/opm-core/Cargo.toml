@@ -14,5 +14,8 @@ workspace = true
 [dependencies]
 # General-purpose only — never a transport/HID crate. See
 # docs/architecture/overview.md and ADR 0002. `serde` is needed to
-# serialize `Identity` for `pmctl discover --export`.
+# serialize `Identity` for `pmctl discover --export`. `thiserror` backs
+# `transport::Error` (see ADR 0003) — neither pulls in a transport
+# library.
 serde = { version = "1", features = ["derive"] }
+thiserror = "1"
