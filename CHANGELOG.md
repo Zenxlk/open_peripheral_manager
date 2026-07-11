@@ -72,3 +72,18 @@ once it has a first release.
     (matches only the AK820 among the machine's other HID devices) →
     a real `HidTransport::open` → capability stubs. Not yet linked into
     `pmctl` (Phase 5). 5 unit tests, all passing, no hardware required.
+- Phase 5 (CLI): `pmctl`'s subcommands wired to a real, explicitly-
+  registered `DriverRegistry`, validated against the real Ajazz AK820
+  Pro:
+  - `list` — enumerates via the same `opm_discovery::discover()` call
+    `discover` itself uses, filtered to supported devices.
+  - `info [--device VID:PID]` — opens the device, prints identity plus
+    which capabilities it exposes.
+  - `rgb get`/`set <RRGGBB>`, `profile get`/`set <N>` — open the device,
+    call the capability if present; `--device VID:PID` disambiguates
+    when more than one supported device is detected. Against the AK820
+    today these correctly surface Phase 4's stub "not yet implemented"
+    error with exit code 1 — expected until Phase 6.
+  - Ran every subcommand and error path (malformed/non-matching
+    `--device`, invalid hex color) against the real device; correct
+    exit codes (`0`/`1`/`2`) throughout.

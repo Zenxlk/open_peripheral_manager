@@ -120,12 +120,32 @@ implementations, per this phase's original goal.
 
 ## Phase 5 — CLI
 
-**Status: stubs only** (`list`/`info`/`rgb`/`profile` print
-"not implemented"). Wire `pmctl`'s subcommands to real
-`Driver`/`Device`/`Capability` calls. Since Phase 4 only produces stub
-capabilities, this phase can be finished — commands run, devices are
-listed and opened — before a single byte of the AK820's real protocol is
-known.
+**Status: fully implemented, validated against real hardware.**
+`pmctl`'s subcommands are wired to a real, explicitly-registered
+`DriverRegistry` (`opm-cli/src/commands/registry.rs`) — exactly as
+Phase 4 predicted, commands run and devices are opened before a single
+byte of the AK820's real protocol is known.
+
+- [x] `list` — enumerates via the same `opm_discovery::discover()`
+      `discover` itself calls, filtered to `driver status == supported`
+      (see `discovery.md`'s now-resolved "Relationship to `list` and
+      `info`").
+- [x] `info [--device VID:PID]` — opens the device, prints identity plus
+      which capabilities it exposes (`rgb`/`battery`/`profiles`).
+- [x] `rgb get`/`rgb set <RRGGBB>`, `profile get`/`profile set <N>` —
+      open the device, call the capability if present. Against the
+      AK820 today these always fail with the Phase 4 stub's "not yet
+      implemented" message and exit code 1 — expected, not a bug in
+      this wiring; `docs/roadmap.md`'s Phase 6 is what changes that.
+      `--device VID:PID` disambiguates when more than one supported
+      device is present (untested against real hardware — only one
+      AK820 unit exists to test with, same category of gap Phase 1
+      flagged for topology grouping).
+- [x] Ran every subcommand for real against the real AK820: `list`,
+      `info`, `info --device 0c45:800a`, `rgb get`/`set`, `profile get`,
+      plus the error paths (`--device` malformed, `--device` matching
+      nothing, an invalid hex color) — all correct exit codes (`0`/`1`/
+      `2`). See the 2026-07-10 devlog.
 
 ## Phase 6 — Protocol reverse-engineering
 

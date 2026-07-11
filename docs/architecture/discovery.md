@@ -532,18 +532,17 @@ would no longer reach — see `docs/inventory/README.md`.
 
 ### Relationship to `list` and `info`
 
-The existing stub for `pmctl list` (`crates/opm-cli/src/commands/list.rs`)
-describes it as showing peripherals "recognized by any registered
-`opm-core` driver" — i.e. the supported subset only, for end users who
-just want to know "can OPM control any of my hardware right now."
-`discover` is the broader, developer/contributor-facing tool: every HID
-device, supported or not, with enough raw detail to start a new driver.
-Concretely: `list` is `discover` filtered to `driver status == supported`
-and rendered without the raw usage-page/interface detail end users don't
-need. This should be revisited once `list` is actually implemented, to
-decide whether `list` calls into the same underlying enumeration or
-whether `discover` is later reimplemented in terms of `list`'s data —
-but the two must not duplicate separate enumeration logic.
+**Resolved in Phase 5.** `pmctl list` (`crates/opm-cli/src/commands/list.rs`)
+shows peripherals "recognized by any registered `opm-core` driver" —
+i.e. the supported subset only, for end users who just want to know
+"can OPM control any of my hardware right now." `discover` stays the
+broader, developer/contributor-facing tool: every HID device, supported
+or not, with enough raw detail to start a new driver. Concretely: `list`
+calls the exact same `opm_discovery::discover()` function `discover`
+itself calls (via `opm-cli`'s shared `commands::device::supported_devices`
+helper), filters to `registry.find(identity).is_some()`, and renders
+without the raw usage-page/interface detail end users don't need — one
+enumeration implementation, not two.
 
 ## Where this lives in the architecture
 
