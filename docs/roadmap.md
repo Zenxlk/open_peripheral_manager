@@ -71,15 +71,28 @@ implementation lives in the new `opm-transport` crate.
 
 ## Phase 3 — Driver system
 
-**Status: sketched, not decided.** The `Driver`/`Device`/`Capability`
-traits and `DriverRegistry` — how a driver crate declares "I can handle
-this `Identity`" and hands back a `Device` exposing `Capabilities`. See
+**Status: fully implemented** as designed in `driver-model.md`. The
+`Driver`/`Device`/`Capability` traits and `DriverRegistry` — how a
+driver crate declares "I can handle this `Identity`" and hands back a
+`Device` exposing `Capabilities`. See
 [`architecture/driver-model.md`](architecture/driver-model.md) and
 [`architecture/domain-model.md`](architecture/domain-model.md).
 
+- [x] Decide the `Capability` pattern (explicit `Device` accessors, not
+      `dyn Any` downcasting — see `driver-model.md`'s reasoning),
+      `Driver`'s stateless `probe`/`open` split, `DriverRegistry`'s
+      explicit-registration shape, and fill in `opm_core::error::Error`.
+- [x] Prototype against two fake, non-overlapping devices (a keyboard
+      with RGB+profiles, a headset with only battery) as in-crate unit
+      tests — 5 tests, all passing, 0 `clippy -D warnings` findings.
+- [ ] Phase 4: a real driver crate for the AK820, validating
+      `Driver::open()` against `opm-transport` and real hardware for the
+      first time — these traits have only been proven against fakes so
+      far.
+
 ## Phase 4 — First driver (Ajazz AK820)
 
-**Status: not started, blocked on phases 1-3.** Build
+**Status: not started, unblocked — phases 1-3 are done.** Build
 `drivers/opm-driver-ajazz-ak820` against the real traits: match its
 `Identity`, open its `Transport`, expose whatever `Capabilities` are
 anticipated for it — even before those capabilities do anything real.

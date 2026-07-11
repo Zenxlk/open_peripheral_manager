@@ -8,7 +8,10 @@
   [`architecture/discovery.md`](architecture/discovery.md) designs how
   hardware is found and classified, before any protocol work starts.
   [`architecture/transport.md`](architecture/transport.md) designs how
-  bytes actually move once a device is opened. Design decisions with
+  bytes actually move once a device is opened.
+  [`architecture/driver-model.md`](architecture/driver-model.md) designs
+  `Driver`/`Device`/`Capability` — how a driver crate declares "I can
+  handle this" and exposes optional features. Design decisions with
   lasting consequences are recorded as ADRs in
   [`architecture/decisions/`](architecture/decisions/).
 - [`inventory/`](inventory/) — a shallow, cross-device catalog: every

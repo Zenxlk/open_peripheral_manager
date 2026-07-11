@@ -31,17 +31,15 @@ on a HID library without `opm-cli` ever seeing it in its dependency tree.
 
 The vendor-agnostic contract layer: what a "device" and a "driver" are,
 in the abstract. Both `opm-cli` and the future GUI depend on this crate
-to talk to a device. It has zero dependencies right now, but that's
-because there's nothing yet to depend on — not a rule against
-dependencies in general. The actual, permanent constraint is narrower:
-`opm-core` must never depend on a transport (HID/USB) library
-(`hidapi`, `libusb`, `udev`, ...) or know about any specific vendor.
-General-purpose crates (serialization, error types, ...) are fine once
-there's a real need for one — see
-[`discovery.md`](discovery.md)'s `Identity` type for the first
-concrete case of this. See
-[`driver-model.md`](driver-model.md) for the (still unfinished) design of
-its traits.
+to talk to a device. Its permanent constraint: `opm-core` must never
+depend on a transport (HID/USB) library (`hidapi`, `libusb`, `udev`,
+...) or know about any specific vendor. General-purpose crates
+(`serde`, `thiserror`) are fine — see [`discovery.md`](discovery.md)'s
+`Identity` type and [`transport.md`](transport.md)'s `Transport` trait
+for the two concrete cases of this so far. `Driver`/`Device`/
+`Capability`/`DriverRegistry` are now designed and implemented, see
+[`driver-model.md`](driver-model.md) — validated so far only against
+fake, in-memory devices; a real driver crate is Phase 4.
 
 ### `opm-discovery`
 
@@ -115,8 +113,8 @@ for the rationale and naming convention.
   `foo` with submodules is `foo.rs` + `foo/bar.rs`, not `foo/mod.rs`
   (the modern, non-2015 style).
 - **Traits:** capability traits are nouns describing the feature, not
-  prefixed with `Has`/`Can` (e.g. `Rgb`, not `HasRgb`) — to be settled
-  for real in [`driver-model.md`](driver-model.md).
+  prefixed with `Has`/`Can` (e.g. `Rgb`, not `HasRgb`) — settled in
+  [`driver-model.md`](driver-model.md).
 
 ## Quality gates
 

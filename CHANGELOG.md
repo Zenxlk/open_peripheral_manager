@@ -48,3 +48,14 @@ once it has a first release.
     a udev rule (`TAG+="uaccess"`) to grant access — the first confirmed
     real I/O exchange with the device's proprietary channel, and the
     permission gap `discovery.md` had already documented as expected.
+- Phase 3 (driver system), designed in `docs/architecture/driver-model.md`:
+  - `Driver` (stateless, `probe`/`open` split), `Device` (identity plus
+    `Option<&dyn Trait>` capability accessors, defaulting to `None`),
+    and `DriverRegistry` (explicit registration, first-match-wins) in
+    `opm-core`.
+  - Three capability traits — `Rgb`, `Battery`, `Profiles` — and
+    `opm_core::error::Error`, composing `transport::Error` via `#[from]`.
+  - Validated with two fake, non-overlapping in-memory devices (a
+    keyboard with RGB+profiles, a headset with only battery): 5 unit
+    tests, all passing. No real driver crate exists yet — that's
+    Phase 4.
