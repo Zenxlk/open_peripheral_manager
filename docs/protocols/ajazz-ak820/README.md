@@ -1,7 +1,21 @@
 # Ajazz AK820 — protocol notes
 
-Status: not started. No reverse engineering has been done yet; this
-directory exists so the process has a home from day one.
+Status: Phase 6 starting. Capture rig: a Windows VM (via `virt-manager`/
+`libvirt`/QEMU, on the same Linux host `opm-core` is developed on) with
+the AK820 passed through via USB host-device passthrough, and Ajazz's
+official configuration software installed inside the guest.
+
+Considered and rejected: capturing on the Linux host itself via
+`usbmon`, which would have let this session's own tooling drive the
+capture directly. Hit real friction getting `/dev/usbmon*` device nodes
+to appear (`usbmon` kernel module present but not creating them; root
+access needed to debug further, which this session's tools can't
+provide interactively) — abandoned in favor of the standard, already-
+proven-elsewhere approach: capture inside the guest, same as the
+original bare-metal-Windows plan this document had before the machine
+setup changed to a VM. The trade-off: the maintainer runs the capture
+himself inside the guest and brings the decoded bytes back, rather than
+this session capturing live.
 
 ## Layout
 
@@ -12,14 +26,60 @@ directory exists so the process has a home from day one.
 - `findings.md` — running notes on what's been figured out: report
   descriptors, command byte layouts, known opcodes, open questions.
 
-## Suggested capture workflow (to refine once started)
+## Capture workflow (Windows VM + Wireshark/USBPcap)
 
-1. Capture known-good interactions from the vendor's official software
-   (e.g. via `usbmon` on Linux or Wireshark's USBPcap).
-2. Save the raw capture into `captures/` with a descriptive name and the
-   date.
-3. Write up what the capture shows in `findings.md`, referencing the
-   capture file by name.
+Decided 2026-07-10, informed by the AK820's real interface shape
+already confirmed in Phase 1/2's Findings (see "Hardware identity"
+below) rather than guessed at generically.
+
+1. **Pass the AK820 through to the Windows guest**, in `virt-manager`:
+   *Add Hardware → USB Host Device*, select the device by its VID:PID
+   (`0c45:800a` — it'll show under whatever generic name the local USB-
+   ID database resolves that VID to, e.g. `Microdia`/`Vivitar`; that
+   name is meaningless noise, same gray-market-VID caveat
+   `discovery.md` already documented, not a different device). This
+   unbinds the device from the host and hands it to the guest — once
+   done, the host no longer sees it as a HID device at all.
+2. **Inside the guest: install Wireshark with USBPcap** (Wireshark's
+   Windows installer offers USBPcap as a checkbox; no separate
+   download) and Ajazz's official configuration software, if not
+   already present.
+3. **Capture on every `USBPcapN` interface** rather than figuring out in
+   advance which root hub the AK820 landed on inside the guest — filter
+   after the fact instead.
+4. **One isolated action at a time**, ~2-3s of idle between each,
+   noting wall-clock time + what was done in a separate notes file.
+   Pure solid, saturated test colors (255,0,0 / 0,255,0 / 0,0,255) make
+   the RGB bytes unambiguous once decoded. Suggested order: open the
+   software (captures startup/handshake traffic) → solid red → solid
+   green → solid blue → brightness up one step → change effect mode →
+   switch profile → switch back. Start with color + profile — that's
+   what `Rgb`/`Profiles` (Phase 3/4) already have real trait shapes for.
+5. **Save as `.pcapng`** into `captures/` (git-ignored, stays local —
+   and stays inside the guest's filesystem unless deliberately copied
+   out, e.g. via a shared folder or USB drive, back to the host where
+   this repo lives).
+6. **Filter to the AK820**: `usb.idVendor == 0x0c45 && usb.idProduct ==
+   0x800a`. If that filter only matches the enumeration/descriptor
+   packet (not the later transfer packets), note the `usb.device_address`
+   shown there and filter by `usb.device_address == <N>` instead for
+   everything downstream.
+7. **Read the filtered packets as HID class control requests** — the
+   vendor channel almost certainly uses `SET_REPORT`/`GET_REPORT` over
+   the control endpoint (the same operations `opm-transport`'s
+   `Transport::set_feature`/`get_feature` already implement):
+   `bmRequestType 0x21`/`bRequest 0x09` for `SET_REPORT`
+   (`bmRequestType 0xA1`/`bRequest 0x01` for `GET_REPORT`), `wValue =
+   (report_type << 8) | report_id` (`report_type`: 1=Input, 2=Output,
+   3=Feature), `wIndex` = interface number, payload = the report bytes.
+   Wireshark's own USB-HID dissector should label these fields by name.
+   `URB_INTERRUPT` packets instead of `URB_CONTROL` mean the interrupt
+   endpoint is used (`write_output`/`read_input`'s territory), not
+   control.
+8. **Bring the decoded bytes back**, not the capture file itself: for
+   each isolated action, the interface, report ID, and payload hex,
+   written up in `findings.md` — the capture file never needs to leave
+   the guest if copying it out is inconvenient, only the write-up does.
 
 ## Hardware identity
 

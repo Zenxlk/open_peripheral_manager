@@ -149,11 +149,22 @@ byte of the AK820's real protocol is known.
 
 ## Phase 6 — Protocol reverse-engineering
 
-**Status: not started.** Figure out the AK820's actual vendor protocol
-(RGB, profiles, whatever else it turns out to expose), turning Phase 4's
-stub `Capability` implementations into real ones. Lives under
+**Status: starting — capture rig identified, no capture done yet.**
+Figure out the AK820's actual vendor protocol (RGB, profiles, whatever
+else it turns out to expose), turning Phase 4's stub `Capability`
+implementations into real ones. Lives under
 [`protocols/ajazz-ak820/`](protocols/ajazz-ak820/); the driver-internal
 `Protocol` concept from `architecture/domain-model.md`.
+
+- [x] Decide the capture method: a Windows VM (`virt-manager`/`libvirt`/
+      QEMU, USB host-device passthrough) with Ajazz's official software
+      installed inside the guest, Wireshark + USBPcap. Capturing on the
+      Linux host itself via `usbmon` was tried first and abandoned —
+      see `protocols/ajazz-ak820/README.md`'s status note for why.
+- [ ] Run the actual capture (color changes, profile switches) and
+      write up the decoded bytes in `protocols/ajazz-ak820/findings.md`.
+- [ ] Turn `AjazzAk820Device`'s `Rgb`/`Profiles` stubs into real
+      implementations against the decoded protocol.
 
 ## Phase 7 — GUI
 
