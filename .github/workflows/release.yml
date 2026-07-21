@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-release:
+    name: build & publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system HID/USB dev libraries
+        run: sudo apt-get update && sudo apt-get install -y libusb-1.0-0-dev libudev-dev
+
+      # Never publish a release that doesn't pass the same checks CI
+      # runs on every PR — a tag push doesn't go through branch
+      # protection, so this job re-verifies rather than trusting it.
+      - run: cargo test --workspace
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - run: cargo build --release --workspace
+
+      - name: Package pmctl
+        run: |
+          mkdir -p dist
+          tar -czf "dist/pmctl-${GITHUB_REF_NAME}-x86_64-linux-gnu.tar.gz" \
+            -C target/release pmctl
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          generate_release_notes: true

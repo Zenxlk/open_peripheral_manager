@@ -1,8 +1,7 @@
 # Contributing
 
-Thanks for considering contributing. The project is in early scaffolding
-— see [`docs/roadmap.md`](docs/roadmap.md) for what's actually in scope
-right now before proposing large changes.
+Thanks for considering contributing. See [`docs/roadmap.md`](docs/roadmap.md)
+for what's actually in scope right now before proposing large changes.
 
 ## Ground rules
 
@@ -40,6 +39,18 @@ cargo fmt --all
 ```
 
 All four run in CI on every pull request; please run them locally first.
+
+## Branching
+
+`master` only ever moves via a merged pull request — including for the
+maintainer's own changes, even working solo. Create a branch off
+`master` for anything you're changing (`git checkout -b <short-name>`),
+push it, and open a PR rather than committing to `master` directly.
+This is what keeps `CHANGELOG.md`/`docs/devlog/` and the commit history
+meaningful as the project grows past a single contributor.
+
+See [`RELEASING.md`](RELEASING.md) for cutting a tagged release once
+something's ready.
 
 ## Commit / PR style
 
