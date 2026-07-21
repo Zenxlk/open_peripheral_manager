@@ -6,12 +6,15 @@ device lives in its own independent driver crate behind a shared
 interface. Development starts with the **Ajazz AK820** keyboard, but the
 AK820 is the first supported device, not the point of the project.
 
-Status: **early scaffolding.** `pmctl discover` enumerates and classifies
-HID devices for real (see below) — but there is no protocol
-implementation or working driver yet — see
-[`docs/roadmap.md`](docs/roadmap.md). This repository currently exists to
-get the architecture and tooling right before any device-specific code is
-written.
+Status: **first device partly working end-to-end.** `pmctl` can
+discover, list, and inspect HID devices, and open a real driver's
+capabilities — for the one driver that exists so far
+(`opm-driver-ajazz-ak820`), solid-color RGB control is validated
+against physical hardware; everything else (reading state back,
+profiles, a second device/vendor) is still ahead. See
+[`docs/roadmap.md`](docs/roadmap.md) for exactly what's done per phase,
+and a driver crate's own `docs/protocols/<vendor>-<model>/README.md`
+for anything specific to running it against real hardware.
 
 ## Why
 
@@ -27,8 +30,10 @@ learning Rust with an emphasis on doing it properly rather than quickly.
 crates/
   opm-core/       # library: vendor-agnostic device/driver abstractions
   opm-discovery/  # library: HID enumeration/grouping/classification
+  opm-transport/  # library: Transport implementations (hidapi, libusb)
   opm-cli/        # binary `pmctl`: command-line front-end
-drivers/          # one crate per supported device (empty for now)
+drivers/          # one crate per supported device
+  opm-driver-ajazz-ak820/  # the first one — see its own docs/protocols/ note
 docs/             # architecture decisions, protocol notes, roadmap, devlog
 ```
 
@@ -38,16 +43,22 @@ the reasoning behind this layout.
 ## The CLI
 
 ```
-pmctl discover     # every HID device on the system, supported or not — implemented
-pmctl list         # detected, supported peripherals — not implemented yet
-pmctl info         # details about one — not implemented yet
-pmctl rgb          # RGB lighting control — not implemented yet
-pmctl profile      # device profile management — not implemented yet
+pmctl discover              # every HID device on the system, supported or not
+pmctl list                  # detected, supported peripherals
+pmctl info [--device VID:PID]
+pmctl rgb get|set <RRGGBB>
+pmctl profile get|set <N>
 ```
 
-`discover` works today: it needs no driver and no protocol knowledge,
-only a connected HID device. See
-[`docs/architecture/discovery.md`](docs/architecture/discovery.md).
+All five subcommands are wired up and run against real hardware.
+`discover`/`list`/`info` need no driver-specific protocol knowledge —
+see [`docs/architecture/discovery.md`](docs/architecture/discovery.md).
+`rgb`/`profile` depend entirely on what the matched driver actually
+implements: against `opm-driver-ajazz-ak820` today, `rgb set` really
+works, everything else in those two subcommands still returns "not yet
+implemented" (`opm-driver-ajazz-ak820`'s own protocol notes explain
+what that needs and, for some devices, extra setup like a permissive
+udev rule or `sudo`).
 
 ## Building
 

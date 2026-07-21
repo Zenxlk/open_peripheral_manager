@@ -1,9 +1,73 @@
 # Ajazz AK820 — protocol notes
 
-Status: Phase 6 starting. Capture rig: a Windows VM (via `virt-manager`/
-`libvirt`/QEMU, on the same Linux host `opm-core` is developed on) with
-the AK820 passed through via USB host-device passthrough, and Ajazz's
-official configuration software installed inside the guest.
+Status: solid-color RGB control works for real, validated against
+physical hardware (`pmctl rgb set`). `get_color`, profiles, sleep
+timer, and clock sync are still open — see `findings.md`'s known gaps
+and `docs/roadmap.md`'s Phase 6 checklist.
+
+## Using RGB control
+
+```
+pmctl rgb set ff8800   # RRGGBB hex
+```
+
+This needs raw USB access beyond a normal user's default permissions,
+because of a device-specific quirk (see `findings.md`'s "root cause"
+entries): Linux's `hid-generic` kernel driver silently swallows this
+device's Feature-report *writes*, so `opm-transport`'s `LibusbTransport`
+detaches the kernel driver and talks raw `libusb` control transfers
+instead (see [ADR 0004](../../architecture/decisions/0004-libusb-transport-for-kernel-driver-interference.md)).
+This is **not** a general requirement of this project or of `pmctl`
+itself — it's this one device's firmware being picky. A driver for a
+better-behaved device would just work over the normal `hidraw` path
+(`HidTransport`), no `sudo`, no udev rule beyond Phase 2's.
+
+**Permissions**, in the order to try them:
+1. Install [`99-ak820-usb.rules`](99-ak820-usb.rules) (`sudo cp` into
+   `/etc/udev/rules.d/`, `sudo udevadm control --reload-rules`,
+   `sudo udevadm trigger`, then unplug/replug the keyboard) — grants
+   non-root access to the raw USB device node. On the machine this was
+   developed on, the resulting `uaccess` ACL never actually appeared
+   (`getfacl` showed nothing), for reasons not diagnosed — the rule is
+   still correct and worth trying on a fresh system.
+2. If that doesn't work, run `pmctl rgb set`/`profile` with `sudo`.
+
+**If a run leaves the vendor interface broken** (symptom: `pmctl
+discover --verbose` shows only 3 AK820 interfaces instead of 4, or
+`pmctl rgb set` fails with "no interface declares the expected vendor
+usage pair"): a process that opened `LibusbTransport` exited without
+running its `Drop` (a crash, a `SIGKILL`, or — the bug this project hit
+and fixed — `std::process::exit()` called before the device was
+dropped), leaving interface 3 detached from the kernel driver with
+nothing to re-attach it. Fix:
+```
+# find the interface path — usually <bus>-<port>:1.3 for the AK820;
+# confirm with: for i in /sys/bus/usb/devices/*:1.3; do echo "$i"; done
+echo -n "<bus>-<port>:1.3" | sudo tee /sys/bus/usb/drivers/usbhid/bind
+```
+A physical unplug/replug does *not* reliably fix this on its own (seen
+in practice) — the manual rebind above does.
+
+## Layout
+
+- `captures/` — raw USB/HID captures (`usbmon`, Wireshark/`usbpcap`
+  dumps, etc.). Ignored by git (see root `.gitignore`) because these are
+  large binary artifacts; only the analysis derived from them belongs in
+  version control.
+- `findings.md` — running notes on what's been figured out: report
+  descriptors, command byte layouts, known opcodes, open questions.
+- `99-ak820-usb.rules` — the udev rule from "Using RGB control" above.
+
+## Capture workflow (Windows VM + Wireshark/USBPcap)
+
+How the byte-level protocol below was actually figured out — useful
+reference if a future capability (profiles, sleep timer) needs a fresh
+capture, not something you need to redo just to use `pmctl rgb set`.
+
+Capture rig: a Windows VM (via `virt-manager`/`libvirt`/QEMU, on the
+same Linux host `opm-core` is developed on) with the AK820 passed
+through via USB host-device passthrough, and Ajazz's official
+configuration software installed inside the guest.
 
 Considered and rejected: capturing on the Linux host itself via
 `usbmon`, which would have let this session's own tooling drive the
@@ -16,17 +80,6 @@ original bare-metal-Windows plan this document had before the machine
 setup changed to a VM. The trade-off: the maintainer runs the capture
 himself inside the guest and brings the decoded bytes back, rather than
 this session capturing live.
-
-## Layout
-
-- `captures/` — raw USB/HID captures (`usbmon`, Wireshark/`usbpcap`
-  dumps, etc.). Ignored by git (see root `.gitignore`) because these are
-  large binary artifacts; only the analysis derived from them belongs in
-  version control.
-- `findings.md` — running notes on what's been figured out: report
-  descriptors, command byte layouts, known opcodes, open questions.
-
-## Capture workflow (Windows VM + Wireshark/USBPcap)
 
 Decided 2026-07-10, informed by the AK820's real interface shape
 already confirmed in Phase 1/2's Findings (see "Hardware identity"
@@ -108,8 +161,8 @@ report lives in
   just discovery-level enumeration (which needs no permissions at all).
 
 Three distinct vendor usage pages (one shared with interface 1, two
-dedicated) is the headline surprise here — likely separate command
-channels for different features. Which one does what (RGB? macros?
-profiles?) is exactly what the reverse-engineering pass into this
-directory (Phase 6, not yet started) needs to answer; discovery
-deliberately stops before that.
+dedicated) was the headline surprise here — likely separate command
+channels for different features. Interface 3 (`0xff13/0x01`) is the one
+lighting control uses, decoded in `findings.md`; what interfaces 1 and
+2's vendor channels do (macros? the LCD gohv's tool also controls on
+the closely related `0x8009` variant?) is still open.

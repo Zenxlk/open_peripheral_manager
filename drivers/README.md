@@ -5,11 +5,16 @@ combination. It is wired into the workspace (`drivers/*` in the root
 `Cargo.toml`), so a new driver crate is picked up automatically, no root
 `Cargo.toml` edit required.
 
-`opm-driver-ajazz-ak820` is the first one (Phase 4, see
-`docs/roadmap.md`): matches the real AK820, opens its vendor `Transport`,
-exposes `Rgb`/`Profiles` — with stub implementations, since no protocol
-reverse-engineering (Phase 6) has happened yet. Not linked into `pmctl`
-yet either (Phase 5).
+`opm-driver-ajazz-ak820` is the first one (see `docs/roadmap.md`):
+matches the real AK820, opens its vendor `Transport`, exposes
+`Rgb`/`Profiles`. Solid-color RGB (`Rgb::set_color`) is real and
+validated against physical hardware; `get_color`/`Profiles` are still
+stubs pending more of Phase 6's protocol reverse-engineering. Linked
+into `pmctl` (`opm-cli/src/commands/registry.rs`). See
+`docs/protocols/ajazz-ak820/README.md` for anything specific to
+running this particular driver against real hardware (permissions,
+troubleshooting) — this file stays about the `drivers/` convention in
+general, not any one device.
 
 ## Why a crate per device (and not one big `drivers` crate)
 
