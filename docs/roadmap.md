@@ -149,10 +149,13 @@ byte of the AK820's real protocol is known.
 
 ## Phase 6 — Protocol reverse-engineering
 
-**Status: starting — capture rig identified, no capture done yet.**
-Figure out the AK820's actual vendor protocol (RGB, profiles, whatever
-else it turns out to expose), turning Phase 4's stub `Capability`
-implementations into real ones. Lives under
+**Status: blocked on a transport-strategy decision, not on the
+protocol.** The AK820's byte-level lighting protocol is understood and
+independently confirmed against real hardware; what's missing is a
+Linux write path that can actually deliver it — see the "root cause"
+finding below. Figure out the AK820's actual vendor protocol (RGB,
+profiles, whatever else it turns out to expose), turning Phase 4's stub
+`Capability` implementations into real ones. Lives under
 [`protocols/ajazz-ak820/`](protocols/ajazz-ak820/); the driver-internal
 `Protocol` concept from `architecture/domain-model.md`.
 
@@ -161,10 +164,42 @@ implementations into real ones. Lives under
       installed inside the guest, Wireshark + USBPcap. Capturing on the
       Linux host itself via `usbmon` was tried first and abandoned —
       see `protocols/ajazz-ak820/README.md`'s status note for why.
-- [ ] Run the actual capture (color changes, profile switches) and
-      write up the decoded bytes in `protocols/ajazz-ak820/findings.md`.
-- [ ] Turn `AjazzAk820Device`'s `Rgb`/`Profiles` stubs into real
-      implementations against the decoded protocol.
+- [x] Ran real captures against the AK820 Pro and decoded the solid-
+      color `SET_REPORT` command (interface 3, Feature report 0):
+      `01 <R> <G> <B> 00×5 05 03 00×3 AA 55 00×48`, confirmed across
+      four separate color changes. See `protocols/ajazz-ak820/
+      findings.md`'s first 2026-07-20 entry.
+- [x] `AjazzAk820Device::set_color` implemented against the decoded
+      layout, unit-tested against a fake `Transport` — **run for real
+      against the physical keyboard and confirmed to have no visible
+      effect**, despite succeeding at the USB level. Not a bug in this
+      driver crate; see the next line.
+- [x] **Root cause found**: `opm-transport`'s `HidTransport` (hidapi,
+      Linux hidraw backend) can read Feature reports fine but its writes
+      are silently swallowed by the kernel's `hid-generic` driver for
+      this device — reads and writes need genuinely different transport
+      strategies here. Found and verified via two community open-source
+      Linux tools for this keyboard family (credited in full in
+      `findings.md`); confirmed for real against our own hardware by
+      building one of them (`gohv/EPOMAKER-Ajazz-AK820-Pro`, PID patched
+      from its native `0x8009` to our `0x800a`) and watching the
+      keyboard actually change color. See `protocols/ajazz-ak820/
+      findings.md`'s second and third 2026-07-20 entries for the full
+      writeup, credits, and the still-open questions (why `mode=Static`
+      doesn't work and needs a `Breath(speed=0)` substitution; whether
+      `0x800a` and `0x8009` share the *entire* protocol or just lighting).
+- [ ] **Decide the `Transport`/`opm-transport` strategy fix** (open
+      design question, not yet resolved — see `findings.md`): a second,
+      libusb-backed `Transport` implementation; changing `HidTransport`
+      itself to detach the kernel driver for feature-report writes; or
+      something else. Blocks everything below.
+- [ ] Re-implement `AjazzAk820Device::set_color` against whatever that
+      decision produces, and validate for real (`pmctl rgb set`).
+- [ ] Figure out `get_color` (reading the current color back) — not
+      obviously present in the `GET_REPORT` polling traffic captured so
+      far, and neither reference project reads color back either.
+- [ ] Capture and decode profile switching (`Profiles`), still
+      untouched.
 
 ## Phase 7 — GUI
 
