@@ -87,3 +87,31 @@ once it has a first release.
   - Ran every subcommand and error path (malformed/non-matching
     `--device`, invalid hex color) against the real device; correct
     exit codes (`0`/`1`/`2`) throughout.
+- Phase 6 (protocol reverse-engineering), solid-color RGB: `pmctl rgb
+  set` genuinely changes the real Ajazz AK820 Pro's lighting.
+  - Decoded the vendor `SET_REPORT` command via real Wireshark/USBPcap
+    captures against the vendor's official Windows software
+    (`docs/protocols/ajazz-ak820/findings.md`).
+  - New `opm-transport::LibusbTransport` (`rusb`-backed), added
+    alongside `HidTransport` per
+    [ADR 0004](docs/architecture/decisions/0004-libusb-transport-for-kernel-driver-interference.md):
+    this device's Feature-report writes are silently swallowed by
+    Linux's `hid-generic` kernel driver over `hidraw`, and only work
+    with the kernel driver explicitly detached.
+  - `AjazzAk820Device::set_color` reimplemented against
+    `LibusbTransport`, sending the `START`/`START_MODE`/data/`FINISH`
+    transaction gohv/EPOMAKER-Ajazz-AK820-Pro and
+    TaxMachine/ajazz-keyboard-software-linux (credited in full in
+    `findings.md`) had already reverse-engineered for the closely
+    related PID `0x8009`. New `drivers/opm-driver-ajazz-ak820/src/
+    protocol.rs` carries gohv's full `LightingMode`/`Direction`/
+    `SleepTime` vocabulary, not just what `set_color` currently uses.
+  - Fixed three more bugs surfaced only by real-hardware testing:
+    missing inter-packet delays, a `get_feature` `wLength` off-by-one
+    (found via an independent second-opinion review), and `pmctl`'s
+    `std::process::exit()` skipping the `Drop` that re-attaches the
+    kernel HID driver (fixed in `rgb`/`profile`/`info`).
+  - Verified with four real colors and back-to-back runs with no
+    manual intervention. `get_color`, profiles, sleep timer, and
+    running without `sudo` remain open (see `findings.md`'s known
+    gaps).

@@ -149,13 +149,13 @@ byte of the AK820's real protocol is known.
 
 ## Phase 6 — Protocol reverse-engineering
 
-**Status: blocked on a transport-strategy decision, not on the
-protocol.** The AK820's byte-level lighting protocol is understood and
-independently confirmed against real hardware; what's missing is a
-Linux write path that can actually deliver it — see the "root cause"
-finding below. Figure out the AK820's actual vendor protocol (RGB,
-profiles, whatever else it turns out to expose), turning Phase 4's stub
-`Capability` implementations into real ones. Lives under
+**Status: solid-color RGB done and validated against real hardware.**
+`pmctl rgb set` genuinely changes the AK820 Pro's lighting (tested with
+four different colors, two runs back-to-back with no manual
+intervention). Profiles, brightness-only changes, and reading color
+back are still open. Figure out the AK820's actual vendor protocol
+(RGB, profiles, whatever else it turns out to expose), turning Phase
+4's stub `Capability` implementations into real ones. Lives under
 [`protocols/ajazz-ak820/`](protocols/ajazz-ak820/); the driver-internal
 `Protocol` concept from `architecture/domain-model.md`.
 
@@ -188,18 +188,38 @@ profiles, whatever else it turns out to expose), turning Phase 4's stub
       writeup, credits, and the still-open questions (why `mode=Static`
       doesn't work and needs a `Breath(speed=0)` substitution; whether
       `0x800a` and `0x8009` share the *entire* protocol or just lighting).
-- [ ] **Decide the `Transport`/`opm-transport` strategy fix** (open
-      design question, not yet resolved — see `findings.md`): a second,
-      libusb-backed `Transport` implementation; changing `HidTransport`
-      itself to detach the kernel driver for feature-report writes; or
-      something else. Blocks everything below.
-- [ ] Re-implement `AjazzAk820Device::set_color` against whatever that
-      decision produces, and validate for real (`pmctl rgb set`).
+- [x] **Transport-strategy decision made and implemented**: ADR 0004
+      (`architecture/decisions/0004-libusb-transport-for-kernel-driver-interference.md`)
+      — a second `Transport` implementation, `LibusbTransport`
+      (`opm-transport`, the `rusb` crate), detaches the kernel driver
+      and speaks raw USB control transfers. `HidTransport` is
+      unchanged and still the default for devices without this quirk.
+- [x] **`AjazzAk820Device::set_color` re-implemented and validated for
+      real.** Ported gohv/EPOMAKER-Ajazz-AK820-Pro's lighting-mode
+      vocabulary into `drivers/opm-driver-ajazz-ak820/src/protocol.rs`
+      (credited there); `set_color` now sends the full `START`/
+      `START_MODE`/data(`Breath`, speed `0`)/`FINISH` sequence over
+      `LibusbTransport`. Getting a genuinely visible result needed three
+      more bug fixes beyond the transport switch itself — missing
+      inter-packet delays, a `get_feature` `wLength` bug (found by an
+      independent Fable 5 review, not by testing), and `pmctl`'s
+      `std::process::exit()` skipping the `Drop` that re-attaches the
+      kernel driver — see `protocols/ajazz-ak820/findings.md`'s final
+      2026-07-20 entry for the full story. `pmctl rgb set` confirmed
+      working with four different real colors.
+- [ ] `pmctl rgb set`/`profile` still need `sudo` — the new `usb`-
+      subsystem udev rule (`protocols/ajazz-ak820/99-ak820-usb.rules`)
+      doesn't visibly grant access the way Phase 2's `hidraw` rule does;
+      not diagnosed further, see findings.md's known gaps.
 - [ ] Figure out `get_color` (reading the current color back) — not
       obviously present in the `GET_REPORT` polling traffic captured so
       far, and neither reference project reads color back either.
-- [ ] Capture and decode profile switching (`Profiles`), still
-      untouched.
+- [ ] Capture and decode profile switching (`Profiles`), sleep timer,
+      and clock sync — `protocol.rs` already carries the vocabulary for
+      the first two (ported from gohv), not yet wired into any
+      `Capability`.
+- [ ] `LibusbTransport::write_output`/`read_input` (interrupt-endpoint
+      I/O) are implemented but never exercised against real hardware.
 
 ## Phase 7 — GUI
 

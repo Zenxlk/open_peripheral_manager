@@ -229,7 +229,8 @@ decision (and probably its own ADR) before `AjazzAk820Device::set_color`
 can be re-implemented for real — the current implementation still uses
 `opm_transport::HidTransport` and is now known not to work.
 
-**Known gaps, carried forward:**
+**Known gaps, carried forward (superseded by the entry below — kept for
+history):**
 - `opm-driver-ajazz-ak820`'s `set_color` (as currently implemented)
   does not work against real hardware — confirmed broken, not just
   unvalidated. Needs the transport-strategy decision above before
@@ -243,3 +244,102 @@ can be re-implemented for real — the current implementation still uses
   Breath color cycle was verified.
 - `get_color` still unimplemented; neither reference project reads
   color back either (gohv's `AK820Device` structs don't expose a getter).
+
+## 2026-07-20 — `set_color` works for real: `LibusbTransport` implemented, three more bugs found and fixed
+
+Following the "root cause" entry's decision (ADR 0004), implemented
+`opm-transport::LibusbTransport` (`rusb`-backed, kernel-driver-detach,
+same `Transport` trait as `HidTransport`) and rewrote
+`AjazzAk820Driver`/`AjazzAk820Device` to use it, porting
+gohv/EPOMAKER-Ajazz-AK820-Pro's `LightingMode`/`Direction`/`SleepTime`
+vocabulary into a new `drivers/opm-driver-ajazz-ak820/src/protocol.rs`
+(credited there; see that module's docs — an independent re-expression
+of their protocol facts, not a copy of their source, since neither
+source repo has a recognized `LICENSE` file). `set_color` sends
+`START` → `START_MODE` → (`Breath` mode, speed `0`, target color) →
+`FINISH`, each a `Transport::set_feature` call.
+
+**First real run: still no visible effect**, despite byte-identical
+packets to the now-confirmed-working `gohv` binary. Three more bugs
+found, in order of discovery:
+
+1. **No delay between packets.** `gohv`'s `send_feature` sleeps 10ms
+   after every packet and an extra 100ms after the full 4-packet
+   transaction ("small delay for device to process" / "extra delay
+   after full transaction for device processing") — this project's
+   first `LibusbTransport`/driver had no delays at all. Added
+   `INTER_PACKET_DELAY`/`POST_TRANSACTION_DELAY` constants in
+   `drivers/opm-driver-ajazz-ak820/src/lib.rs`, matching gohv's timing
+   exactly.
+2. **`LibusbTransport::get_feature` requested one byte too many.**
+   Copied `HidTransport`'s "allocate `buf.len() + 1`, strip a leading
+   Report-ID byte" convention without noticing it's a `hidraw`-ioctl-
+   specific convention (the Linux kernel always synthesizes that byte
+   for `HIDIOCGFEATURE` regardless of the device's own framing) — raw
+   `libusb` control transfers have no such synthetic byte; the DATA
+   stage is exactly what the device sends. Requesting `wLength = 65`
+   instead of gohv's exact `64` sent the wrong request to a device
+   already known to be picky about this specific exchange (recall
+   TaxMachine's own comment: "No GET_REPORT — it corrupts EP0 state on
+   this device"). Fixed to read exactly the caller's buffer length,
+   with no byte-stripping. **Found by an independent second-opinion
+   review (a Claude Fable 5 agent), not by direct testing** — asked for
+   one specifically because two prior real-hardware attempts (byte-exact
+   replay, then a from-scratch libusb reimplementation) had both failed
+   for reasons not obvious from staring at the code longer.
+3. **`std::process::exit()` skips `Drop`, so the kernel driver was
+   never re-attached.** `pmctl`'s command implementations
+   (`rgb.rs`/`profile.rs`/`info.rs`) all called `std::process::exit()`
+   directly after using an opened device — which, on real hardware,
+   left interface 3 permanently detached from Linux's `hid-generic`
+   driver after every single run (confirmed via
+   `udevadm`/`/sys/bus/usb/devices/3-2:1.3/driver` showing no driver
+   bound, even after a full physical unplug/replug — only a manual
+   `echo -n "3-2:1.3" | sudo tee /sys/bus/usb/drivers/usbhid/bind`
+   brought it back). Fixed by restructuring `rgb.rs`/`profile.rs`/
+   `info.rs` to compute the outcome first, explicitly `drop()` the
+   opened device, *then* call `std::process::exit()` — `list.rs`/
+   `discover.rs` don't open a device at all and don't have this problem.
+
+**Confirmed working after all three fixes**, running the real
+`pmctl rgb set` binary against the physical AK820 Pro (`sudo`, no udev
+workaround needed for the *device* handling anymore — see the next
+paragraph for the *permission* story): `feb973` (orange), `00ff00`
+(green), `0000ff` (blue), `ff00ff` (magenta) all visibly changed the
+keyboard's lighting. Two consecutive `rgb set` calls with no manual
+intervention between them both succeeded — confirming fix #3 actually
+solved the recurring breakage, not just the one run it was tested on.
+
+**Permissions: a second, broader udev rule is needed**, beyond Phase
+2's `hidraw`-only one — `docs/protocols/ajazz-ak820/99-ak820-usb.rules`
+(`SUBSYSTEM=="usb" ... TAG+="uaccess"`). Installed it, but the real
+`uaccess` ACL never actually appeared on the device node even after
+reloading rules and a real physical replug (`getfacl` showed no
+`user:...` entry) — cause not diagnosed, not worth blocking on. `pmctl
+rgb set` was validated with `sudo` throughout; running it as a normal
+user is still an open gap, tracked below, separate from the interface-
+orphaning bug fix #3 solved.
+
+**Known gaps, carried forward:**
+- `pmctl rgb set` (and `profile`) still need `sudo` in practice — the
+  `uaccess` udev rule for the `usb` subsystem doesn't visibly take
+  effect on this machine/session, unlike the `hidraw`-only rule from
+  Phase 2, which does. Not diagnosed further.
+- `get_color` still unimplemented; the `05 03`/`AA 55`-family footer
+  bytes are still unexplained; profiles/sleep-timer/clock-sync/LCD are
+  still unported despite the vocabulary now existing in `protocol.rs`.
+- Whether `0x800a` and `0x8009` share the *entire* protocol or just the
+  lighting-mode transaction is still untested beyond solid colors.
+- `LibusbTransport::write_output`/`read_input` (interrupt-endpoint I/O,
+  needed for e.g. the LCD image upload gohv also implements) are
+  written but have never been exercised against real hardware — only
+  `get_feature`/`set_feature` (control transfers) have.
+- If a `LibusbTransport` caller's process ever exits without running
+  `Drop` (a panic that unwinds past the caller but still enters `Drop`
+  is fine; a hard crash, `SIGKILL`, or another `std::process::exit()`
+  call site added later without the same care is not), interface 3
+  will need the same manual `usbhid` rebind used throughout this
+  investigation to recover — this is a structural fragility of the
+  kernel-driver-detach approach itself (ADR 0004's "Consequences"),
+  not fully eliminated, only worked around at every currently-known
+  call site.
