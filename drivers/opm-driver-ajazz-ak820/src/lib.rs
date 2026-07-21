@@ -13,8 +13,16 @@ use opm_core::capability::{Profiles, Rgb, RgbColor};
 use opm_core::device::Device;
 use opm_core::driver::Driver;
 use opm_core::error::Error;
-use opm_core::identity::{Identity, UsagePair};
+use opm_core::identity::{Identity, Interface, UsagePair};
 use opm_core::transport::Transport;
+
+/// The AK820's lighting-mode vocabulary and packet layout — public so
+/// other code (a future GUI, another capability implementation) can
+/// build on the full mode/direction/sleep-timer catalog this crate
+/// carries even though only `Static` is wired into a `Capability` so
+/// far. See the module's own docs for credits.
+pub mod protocol;
+use protocol::{CONTROL_REPORT_ID, Direction, LightingMode, control_packet, mode_data_packet};
 
 /// USB vendor id. `0x0c45` is Sonix Technology, the OEM controller
 /// vendor, not Ajazz itself — see
@@ -53,14 +61,30 @@ impl Driver for AjazzAk820Driver {
     }
 
     fn open(&self, identity: &Identity) -> Result<Box<dyn Device>, Error> {
-        let vendor_path = vendor_interface_path(identity).ok_or_else(|| {
+        let vendor_iface = vendor_interface(identity).ok_or_else(|| {
             Error::Driver(
                 "AK820: no interface declares the expected vendor usage pair (0xff13/0x01)"
                     .to_owned(),
             )
         })?;
 
-        let vendor = opm_transport::HidTransport::open(vendor_path)?;
+        let interface_number = u8::try_from(vendor_iface.interface_number).map_err(|_| {
+            Error::Driver(format!(
+                "AK820: vendor interface has no usable USB interface number ({})",
+                vendor_iface.interface_number
+            ))
+        })?;
+
+        // LibusbTransport, not HidTransport — see ADR 0004 and
+        // docs/protocols/ajazz-ak820/findings.md's 2026-07-20 "root
+        // cause" entry: this device's Feature-report writes are
+        // silently swallowed by Linux's hid-generic kernel driver over
+        // hidraw, and only work with the kernel driver detached.
+        let vendor = opm_transport::LibusbTransport::open(
+            identity.vendor_id,
+            identity.product_id,
+            interface_number,
+        )?;
 
         Ok(Box::new(AjazzAk820Device {
             identity: identity.clone(),
@@ -69,12 +93,11 @@ impl Driver for AjazzAk820Driver {
     }
 }
 
-fn vendor_interface_path(identity: &Identity) -> Option<&str> {
+fn vendor_interface(identity: &Identity) -> Option<&Interface> {
     identity
         .interfaces
         .iter()
         .find(|iface| iface.usage_pairs.contains(&VENDOR_USAGE_PAIR))
-        .map(|iface| iface.path.as_str())
 }
 
 /// A live handle to an opened AK820.
@@ -109,6 +132,37 @@ fn not_yet_implemented(capability: &str) -> Error {
     ))
 }
 
+/// How long to wait after each packet for the device to process it —
+/// matching gohv/EPOMAKER-Ajazz-AK820-Pro's `send_feature`, whose
+/// comment calls this "small delay for device to process". Our own
+/// first libusb attempt sent every packet back-to-back with no delay
+/// at all and had no visible effect on real hardware; this is untested
+/// as its own variable but is the leading suspect — see findings.md.
+const INTER_PACKET_DELAY: std::time::Duration = std::time::Duration::from_millis(10);
+
+/// How long to wait after a full `START`/`START_MODE`/data/`FINISH`
+/// transaction completes, matching gohv's `transaction`'s "extra delay
+/// after full transaction for device processing".
+const POST_TRANSACTION_DELAY: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// Sends one 64-byte packet's `Transport::set_feature` call (byte 0 as
+/// `report_id`, the rest as `data`), then — only for `CONTROL_REPORT_ID`
+/// packets — a `get_feature` handshake read, matching
+/// gohv/EPOMAKER-Ajazz-AK820-Pro's finding that reading back the
+/// lighting-data packet's report ID (a mode value, not `0x04`) makes
+/// the device unresponsive. Sleeps `INTER_PACKET_DELAY` afterward either
+/// way, also matching gohv.
+fn send(transport: &dyn Transport, packet: [u8; 64]) -> Result<(), Error> {
+    let report_id = packet[0];
+    transport.set_feature(report_id, &packet[1..])?;
+    if report_id == CONTROL_REPORT_ID {
+        let mut discard = [0u8; 64];
+        let _ = transport.get_feature(report_id, &mut discard);
+    }
+    std::thread::sleep(INTER_PACKET_DELAY);
+    Ok(())
+}
+
 impl Rgb for AjazzAk820Device {
     fn get_color(&self) -> Result<RgbColor, Error> {
         // Proves the vendor transport is genuinely alive on every call,
@@ -118,48 +172,36 @@ impl Rgb for AjazzAk820Device {
         // arbitrary size used there, not the interface's real report
         // length (transport.md flags this as a known gap). A transport
         // failure (unplugged, permission revoked) surfaces as-is; a
-        // successful read still can't be decoded into a color yet.
+        // successful read still can't be decoded into a color yet — the
+        // background GET_REPORT polling traffic doesn't obviously
+        // mirror the active color, see findings.md.
         let mut buf = [0u8; 64];
         self.vendor.get_feature(0, &mut buf)?;
         Err(not_yet_implemented("Rgb::get_color (protocol unknown)"))
     }
 
     fn set_color(&self, color: RgbColor) -> Result<(), Error> {
-        // Byte layouts reverse-engineered from real USB captures against
-        // the vendor's official software — see
-        // docs/protocols/ajazz-ak820/findings.md.
-        //
-        // A plain `set_color` write alone doesn't light up the keyboard:
-        // the vendor software only applies a color while its "Static"
-        // effect mode is active, selected via a separate command. Send
-        // that "activate Static mode" command first (opcode 0x02,
-        // substituting the target color for the default red the real
-        // capture carried — unconfirmed the firmware reads it at all),
-        // then the color-update command (opcode 0x01) every real capture
-        // agreed on.
-        let mut activate_static = [0u8; 64];
-        activate_static[0] = 0x02;
-        activate_static[1] = color.r;
-        activate_static[2] = color.g;
-        activate_static[3] = color.b;
-        activate_static[9] = 0x01;
-        activate_static[10] = 0x05;
-        activate_static[11] = 0x03;
-        activate_static[15] = 0xaa;
-        activate_static[16] = 0x55;
-        self.vendor.set_feature(0, &activate_static)?;
-
-        let mut set_color = [0u8; 64];
-        set_color[0] = 0x01;
-        set_color[1] = color.r;
-        set_color[2] = color.g;
-        set_color[3] = color.b;
-        set_color[9] = 0x05;
-        set_color[10] = 0x03;
-        set_color[14] = 0xaa;
-        set_color[15] = 0x55;
-        self.vendor.set_feature(0, &set_color)?;
-
+        // Requesting LightingMode::Static (0x01) directly does not
+        // work on this hardware — an empirically-found substitution,
+        // not understood, see findings.md. Breath with speed = 0
+        // produces a static-looking color instead.
+        send(&*self.vendor, control_packet(protocol::CMD_START, 0x01))?;
+        send(&*self.vendor, control_packet(protocol::CMD_MODE, 0x01))?;
+        send(
+            &*self.vendor,
+            mode_data_packet(
+                LightingMode::Breath,
+                color.r,
+                color.g,
+                color.b,
+                false,
+                protocol::MAX_BRIGHTNESS,
+                0,
+                Direction::Left,
+            ),
+        )?;
+        send(&*self.vendor, control_packet(protocol::CMD_FINISH, 0x01))?;
+        std::thread::sleep(POST_TRANSACTION_DELAY);
         Ok(())
     }
 }
@@ -191,10 +233,10 @@ mod tests {
         }
     }
 
-    fn interface(usage_pairs: Vec<UsagePair>) -> Interface {
+    fn interface(interface_number: i32, usage_pairs: Vec<UsagePair>) -> Interface {
         Interface {
-            interface_number: 0,
-            path: "/dev/hidraw4".to_owned(),
+            interface_number,
+            path: format!("/dev/hidraw{interface_number}"),
             usage_pairs,
             report_ids: Vec::new(),
         }
@@ -203,25 +245,34 @@ mod tests {
     // Real AK820 Pro shape, per docs/protocols/ajazz-ak820/README.md.
     fn real_ak820_identity() -> Identity {
         identity_with_interfaces(vec![
-            interface(vec![UsagePair {
-                usage_page: 0x01,
-                usage: 0x06,
-            }]),
-            interface(vec![
-                UsagePair {
-                    usage_page: 0x0c,
-                    usage: 0x01,
-                },
-                UsagePair {
-                    usage_page: 0xffff,
-                    usage: 0x01,
-                },
-            ]),
-            interface(vec![UsagePair {
-                usage_page: 0xff68,
-                usage: 0x61,
-            }]),
-            interface(vec![VENDOR_USAGE_PAIR]),
+            interface(
+                0,
+                vec![UsagePair {
+                    usage_page: 0x01,
+                    usage: 0x06,
+                }],
+            ),
+            interface(
+                1,
+                vec![
+                    UsagePair {
+                        usage_page: 0x0c,
+                        usage: 0x01,
+                    },
+                    UsagePair {
+                        usage_page: 0xffff,
+                        usage: 0x01,
+                    },
+                ],
+            ),
+            interface(
+                2,
+                vec![UsagePair {
+                    usage_page: 0xff68,
+                    usage: 0x61,
+                }],
+            ),
+            interface(3, vec![VENDOR_USAGE_PAIR]),
         ])
     }
 
@@ -248,20 +299,26 @@ mod tests {
     }
 
     #[test]
-    fn vendor_interface_path_finds_the_dedicated_vendor_interface() {
+    fn vendor_interface_finds_the_dedicated_vendor_interface() {
         let identity = real_ak820_identity();
-        assert_eq!(vendor_interface_path(&identity), Some("/dev/hidraw4"));
+        assert_eq!(
+            vendor_interface(&identity).map(|iface| iface.interface_number),
+            Some(3)
+        );
     }
 
     #[test]
     fn open_fails_cleanly_when_the_vendor_interface_is_missing() {
         // No interface declares VENDOR_USAGE_PAIR — open() must fail
-        // before ever touching opm-transport/hidapi, not panic.
+        // before ever touching opm-transport/rusb, not panic.
         let driver = AjazzAk820Driver;
-        let identity = identity_with_interfaces(vec![interface(vec![UsagePair {
-            usage_page: 0x01,
-            usage: 0x06,
-        }])]);
+        let identity = identity_with_interfaces(vec![interface(
+            0,
+            vec![UsagePair {
+                usage_page: 0x01,
+                usage: 0x06,
+            }],
+        )]);
 
         let err = match driver.open(&identity) {
             Err(err) => err,
@@ -275,6 +332,7 @@ mod tests {
     #[derive(Clone, Default)]
     struct FakeTransport {
         set_feature_calls: std::sync::Arc<std::sync::Mutex<Vec<SetFeatureCall>>>,
+        get_feature_report_ids: std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
     }
 
     impl Transport for FakeTransport {
@@ -296,10 +354,11 @@ mod tests {
 
         fn get_feature(
             &self,
-            _report_id: u8,
+            report_id: u8,
             _buf: &mut [u8],
         ) -> Result<usize, opm_core::transport::Error> {
-            unimplemented!("not exercised by this test")
+            self.get_feature_report_ids.lock().unwrap().push(report_id);
+            Ok(0)
         }
 
         fn set_feature(
@@ -316,50 +375,54 @@ mod tests {
     }
 
     #[test]
-    fn set_color_activates_static_mode_then_writes_the_color() {
+    fn set_color_sends_the_start_mode_data_finish_sequence() {
         let transport = FakeTransport::default();
-        let calls = transport.set_feature_calls.clone();
+        let set_feature_calls = transport.set_feature_calls.clone();
+        let get_feature_report_ids = transport.get_feature_report_ids.clone();
         let device = AjazzAk820Device {
             identity: real_ak820_identity(),
             vendor: Box::new(transport),
         };
+        let color = RgbColor {
+            r: 0xfe,
+            g: 0xb9,
+            b: 0x73,
+        };
 
         device
-            .set_color(RgbColor {
-                r: 0xfe,
-                g: 0xb9,
-                b: 0x73,
-            })
+            .set_color(color)
             .expect("set_color should succeed against a fake transport");
 
-        let calls = calls.lock().unwrap();
-        assert_eq!(calls.len(), 2);
+        let expected_packets = [
+            control_packet(protocol::CMD_START, 0x01),
+            control_packet(protocol::CMD_MODE, 0x01),
+            mode_data_packet(
+                LightingMode::Breath,
+                color.r,
+                color.g,
+                color.b,
+                false,
+                protocol::MAX_BRIGHTNESS,
+                0,
+                Direction::Left,
+            ),
+            control_packet(protocol::CMD_FINISH, 0x01),
+        ];
 
-        let (report_id, activate_static) = &calls[0];
-        assert_eq!(*report_id, 0);
-        let mut expected_activate = [0u8; 64];
-        expected_activate[0] = 0x02;
-        expected_activate[1] = 0xfe;
-        expected_activate[2] = 0xb9;
-        expected_activate[3] = 0x73;
-        expected_activate[9] = 0x01;
-        expected_activate[10] = 0x05;
-        expected_activate[11] = 0x03;
-        expected_activate[15] = 0xaa;
-        expected_activate[16] = 0x55;
-        assert_eq!(activate_static.as_slice(), &expected_activate[..]);
+        let calls = set_feature_calls.lock().unwrap();
+        assert_eq!(calls.len(), expected_packets.len());
+        for (call, packet) in calls.iter().zip(expected_packets.iter()) {
+            assert_eq!(call.0, packet[0]);
+            assert_eq!(call.1.as_slice(), &packet[1..]);
+        }
 
-        let (report_id, set_color) = &calls[1];
-        assert_eq!(*report_id, 0);
-        let mut expected_set_color = [0u8; 64];
-        expected_set_color[0] = 0x01;
-        expected_set_color[1] = 0xfe;
-        expected_set_color[2] = 0xb9;
-        expected_set_color[3] = 0x73;
-        expected_set_color[9] = 0x05;
-        expected_set_color[10] = 0x03;
-        expected_set_color[14] = 0xaa;
-        expected_set_color[15] = 0x55;
-        assert_eq!(set_color.as_slice(), &expected_set_color[..]);
+        // Only the three CONTROL_REPORT_ID packets (START/START_MODE/
+        // FINISH) get a GET_REPORT handshake — the data packet's report
+        // ID is the mode value, which findings.md documents as making
+        // the device unresponsive if queried.
+        assert_eq!(
+            get_feature_report_ids.lock().unwrap().as_slice(),
+            &[CONTROL_REPORT_ID, CONTROL_REPORT_ID, CONTROL_REPORT_ID]
+        );
     }
 }
