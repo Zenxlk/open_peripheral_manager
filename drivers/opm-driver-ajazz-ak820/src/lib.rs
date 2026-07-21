@@ -124,8 +124,43 @@ impl Rgb for AjazzAk820Device {
         Err(not_yet_implemented("Rgb::get_color (protocol unknown)"))
     }
 
-    fn set_color(&self, _color: RgbColor) -> Result<(), Error> {
-        Err(not_yet_implemented("Rgb::set_color"))
+    fn set_color(&self, color: RgbColor) -> Result<(), Error> {
+        // Byte layouts reverse-engineered from real USB captures against
+        // the vendor's official software — see
+        // docs/protocols/ajazz-ak820/findings.md.
+        //
+        // A plain `set_color` write alone doesn't light up the keyboard:
+        // the vendor software only applies a color while its "Static"
+        // effect mode is active, selected via a separate command. Send
+        // that "activate Static mode" command first (opcode 0x02,
+        // substituting the target color for the default red the real
+        // capture carried — unconfirmed the firmware reads it at all),
+        // then the color-update command (opcode 0x01) every real capture
+        // agreed on.
+        let mut activate_static = [0u8; 64];
+        activate_static[0] = 0x02;
+        activate_static[1] = color.r;
+        activate_static[2] = color.g;
+        activate_static[3] = color.b;
+        activate_static[9] = 0x01;
+        activate_static[10] = 0x05;
+        activate_static[11] = 0x03;
+        activate_static[15] = 0xaa;
+        activate_static[16] = 0x55;
+        self.vendor.set_feature(0, &activate_static)?;
+
+        let mut set_color = [0u8; 64];
+        set_color[0] = 0x01;
+        set_color[1] = color.r;
+        set_color[2] = color.g;
+        set_color[3] = color.b;
+        set_color[9] = 0x05;
+        set_color[10] = 0x03;
+        set_color[14] = 0xaa;
+        set_color[15] = 0x55;
+        self.vendor.set_feature(0, &set_color)?;
+
+        Ok(())
     }
 }
 
@@ -233,5 +268,98 @@ mod tests {
             Ok(_) => panic!("expected an error"),
         };
         assert!(matches!(err, Error::Driver(_)));
+    }
+
+    type SetFeatureCall = (u8, Vec<u8>);
+
+    #[derive(Clone, Default)]
+    struct FakeTransport {
+        set_feature_calls: std::sync::Arc<std::sync::Mutex<Vec<SetFeatureCall>>>,
+    }
+
+    impl Transport for FakeTransport {
+        fn write_output(
+            &self,
+            _report_id: u8,
+            _data: &[u8],
+        ) -> Result<usize, opm_core::transport::Error> {
+            unimplemented!("not exercised by this test")
+        }
+
+        fn read_input(
+            &self,
+            _buf: &mut [u8],
+            _timeout: opm_core::transport::ReadTimeout,
+        ) -> Result<(u8, usize), opm_core::transport::Error> {
+            unimplemented!("not exercised by this test")
+        }
+
+        fn get_feature(
+            &self,
+            _report_id: u8,
+            _buf: &mut [u8],
+        ) -> Result<usize, opm_core::transport::Error> {
+            unimplemented!("not exercised by this test")
+        }
+
+        fn set_feature(
+            &self,
+            report_id: u8,
+            data: &[u8],
+        ) -> Result<(), opm_core::transport::Error> {
+            self.set_feature_calls
+                .lock()
+                .unwrap()
+                .push((report_id, data.to_vec()));
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn set_color_activates_static_mode_then_writes_the_color() {
+        let transport = FakeTransport::default();
+        let calls = transport.set_feature_calls.clone();
+        let device = AjazzAk820Device {
+            identity: real_ak820_identity(),
+            vendor: Box::new(transport),
+        };
+
+        device
+            .set_color(RgbColor {
+                r: 0xfe,
+                g: 0xb9,
+                b: 0x73,
+            })
+            .expect("set_color should succeed against a fake transport");
+
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 2);
+
+        let (report_id, activate_static) = &calls[0];
+        assert_eq!(*report_id, 0);
+        let mut expected_activate = [0u8; 64];
+        expected_activate[0] = 0x02;
+        expected_activate[1] = 0xfe;
+        expected_activate[2] = 0xb9;
+        expected_activate[3] = 0x73;
+        expected_activate[9] = 0x01;
+        expected_activate[10] = 0x05;
+        expected_activate[11] = 0x03;
+        expected_activate[15] = 0xaa;
+        expected_activate[16] = 0x55;
+        assert_eq!(activate_static.as_slice(), &expected_activate[..]);
+
+        let (report_id, set_color) = &calls[1];
+        assert_eq!(*report_id, 0);
+        let mut expected_set_color = [0u8; 64];
+        expected_set_color[0] = 0x01;
+        expected_set_color[1] = 0xfe;
+        expected_set_color[2] = 0xb9;
+        expected_set_color[3] = 0x73;
+        expected_set_color[9] = 0x05;
+        expected_set_color[10] = 0x03;
+        expected_set_color[14] = 0xaa;
+        expected_set_color[15] = 0x55;
+        assert_eq!(set_color.as_slice(), &expected_set_color[..]);
     }
 }
