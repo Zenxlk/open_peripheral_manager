@@ -1,16 +1,21 @@
-//! `hidapi`-backed implementation of `opm-core`'s [`Transport`] trait.
-//! See `docs/architecture/transport.md` (design) and
+//! `Transport` implementations for `opm-core`'s [`Transport`] trait.
+//! See `docs/architecture/transport.md` (design),
 //! `docs/architecture/decisions/0003-transport-trait-in-core-impl-in-opm-transport.md`
-//! (why this crate exists separately from `opm-core`).
+//! (why this crate exists separately from `opm-core`), and
+//! `docs/architecture/decisions/0004-libusb-transport-for-kernel-driver-interference.md`
+//! (why there are two implementations, not one).
 //!
-//! Depends on `opm-core` and `hidapi` internally; `opm-core` never
-//! depends back on this crate. Does not depend on `opm-discovery`, and
-//! vice versa — see `transport.md` for why the two crates deliberately
-//! don't share code despite both wrapping `hidapi`.
+//! Depends on `opm-core`, `hidapi`, and `rusb` internally; `opm-core`
+//! never depends back on this crate. Does not depend on
+//! `opm-discovery`, and vice versa — see `transport.md` for why the two
+//! crates deliberately don't share code despite both wrapping `hidapi`.
 
 use std::ffi::CString;
 
 use opm_core::transport::{Error, ReadTimeout, Transport};
+
+mod libusb_transport;
+pub use libusb_transport::LibusbTransport;
 
 /// How long [`HidTransport::read_input`]'s [`ReadTimeout::Blocking`]
 /// waits, in milliseconds, before giving up — see `transport.md`'s

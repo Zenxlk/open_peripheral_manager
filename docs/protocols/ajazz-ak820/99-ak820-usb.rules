@@ -1,0 +1,16 @@
+# Grants non-root access to the AK820 Pro's raw USB device node.
+#
+# Needed by opm-transport's LibusbTransport (ADR 0004,
+# docs/architecture/decisions/0004-libusb-transport-for-kernel-driver-interference.md):
+# it detaches the kernel HID driver and talks raw USB control transfers
+# directly, which needs access to the usb subsystem's device node, not
+# just the hidraw one — a broader permission than the hidraw-only rule
+# from Phase 2 (see docs/architecture/transport.md's Findings).
+#
+# Install:
+#   sudo cp 99-ak820-usb.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+# Then unplug and replug the keyboard (or reboot).
+
+SUBSYSTEM=="usb", ATTR{idVendor}=="0c45", ATTR{idProduct}=="800a", TAG+="uaccess"

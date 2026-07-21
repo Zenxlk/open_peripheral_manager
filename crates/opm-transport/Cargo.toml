@@ -20,3 +20,8 @@ opm-core = { path = "../opm-core" }
 hidapi = { version = "2", default-features = false, features = [
     "linux-static-hidraw",
 ] }
+# LibusbTransport — see ADR 0004: some devices' Feature-report writes
+# are silently swallowed by the kernel's HID driver; libusb, with the
+# kernel driver explicitly detached, is the only way found so far to
+# get writes the firmware actually acts on.
+rusb = "0.9"
