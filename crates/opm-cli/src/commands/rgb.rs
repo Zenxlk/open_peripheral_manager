@@ -39,35 +39,59 @@ pub fn run(args: Args) {
     let found = device::select_device(&supported, args.device.as_deref());
     let opened = device::open_or_exit(&registry, found);
 
+    let outcome = act(opened.as_ref(), args);
+
+    // Drop the device (and its Transport) explicitly before exiting.
+    // Every exit below goes through std::process::exit, which skips
+    // destructors — some Transport implementations need theirs to run
+    // (LibusbTransport re-attaches the kernel HID driver it detached on
+    // open, see ADR 0004); skip it and every later invocation targeting
+    // the same interface fails until a manual driver rebind.
+    drop(opened);
+
+    match outcome {
+        Ok(message) => {
+            if let Some(message) = message {
+                println!("{message}");
+            }
+            std::process::exit(device::EXIT_OK);
+        }
+        Err((message, code)) => {
+            eprintln!("{message}");
+            std::process::exit(code);
+        }
+    }
+}
+
+/// Runs `args.action` against an already-opened device, returning what
+/// to print and exit with instead of doing either directly — so `run`
+/// can drop the device first. `Ok(None)` prints nothing (still exits
+/// [`device::EXIT_OK`]).
+fn act(opened: &dyn opm_core::device::Device, args: Args) -> Result<Option<String>, (String, i32)> {
     let Some(rgb) = opened.rgb() else {
-        eprintln!("this device does not support RGB");
-        std::process::exit(device::EXIT_FAILED);
+        return Err((
+            "this device does not support RGB".to_owned(),
+            device::EXIT_FAILED,
+        ));
     };
 
     match args.action {
-        Action::Get => match rgb.get_color() {
-            Ok(color) => println!("{:02x}{:02x}{:02x}", color.r, color.g, color.b),
-            Err(err) => {
-                eprintln!("failed to read color: {err}");
-                std::process::exit(device::EXIT_FAILED);
-            }
-        },
+        Action::Get => rgb
+            .get_color()
+            .map(|color| Some(format!("{:02x}{:02x}{:02x}", color.r, color.g, color.b)))
+            .map_err(|err| (format!("failed to read color: {err}"), device::EXIT_FAILED)),
         Action::Set { color } => {
-            let parsed = parse_hex_color(&color).unwrap_or_else(|err| {
-                eprintln!("invalid color {color:?}: {err}");
-                std::process::exit(device::EXIT_USAGE);
-            });
-            match rgb.set_color(parsed) {
-                Ok(()) => println!("color set"),
-                Err(err) => {
-                    eprintln!("failed to set color: {err}");
-                    std::process::exit(device::EXIT_FAILED);
-                }
-            }
+            let parsed = parse_hex_color(&color).map_err(|err| {
+                (
+                    format!("invalid color {color:?}: {err}"),
+                    device::EXIT_USAGE,
+                )
+            })?;
+            rgb.set_color(parsed)
+                .map(|()| Some("color set".to_owned()))
+                .map_err(|err| (format!("failed to set color: {err}"), device::EXIT_FAILED))
         }
     }
-
-    std::process::exit(device::EXIT_OK);
 }
 
 fn parse_hex_color(s: &str) -> Result<RgbColor, String> {

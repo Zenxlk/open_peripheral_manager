@@ -38,27 +38,54 @@ pub fn run(args: Args) {
     let found = device::select_device(&supported, args.device.as_deref());
     let opened = device::open_or_exit(&registry, found);
 
+    let outcome = act(opened.as_ref(), args);
+
+    // Drop the device (and its Transport) explicitly before exiting —
+    // see rgb.rs's `run` for why (ADR 0004, LibusbTransport's Drop
+    // re-attaching the kernel HID driver).
+    drop(opened);
+
+    match outcome {
+        Ok(message) => {
+            println!("{message}");
+            std::process::exit(device::EXIT_OK);
+        }
+        Err((message, code)) => {
+            eprintln!("{message}");
+            std::process::exit(code);
+        }
+    }
+}
+
+/// Runs `args.action` against an already-opened device, returning what
+/// to print and exit with instead of doing either directly — so `run`
+/// can drop the device first.
+fn act(opened: &dyn opm_core::device::Device, args: Args) -> Result<String, (String, i32)> {
     let Some(profiles) = opened.profiles() else {
-        eprintln!("this device does not support profiles");
-        std::process::exit(device::EXIT_FAILED);
+        return Err((
+            "this device does not support profiles".to_owned(),
+            device::EXIT_FAILED,
+        ));
     };
 
     match args.action {
-        Action::Get => match profiles.active_profile() {
-            Ok(active) => println!("{active}"),
-            Err(err) => {
-                eprintln!("failed to read active profile: {err}");
-                std::process::exit(device::EXIT_FAILED);
-            }
-        },
-        Action::Set { profile } => match profiles.set_active_profile(profile) {
-            Ok(()) => println!("switched to profile {profile}"),
-            Err(err) => {
-                eprintln!("failed to switch profile: {err}");
-                std::process::exit(device::EXIT_FAILED);
-            }
-        },
+        Action::Get => profiles
+            .active_profile()
+            .map(|active| active.to_string())
+            .map_err(|err| {
+                (
+                    format!("failed to read active profile: {err}"),
+                    device::EXIT_FAILED,
+                )
+            }),
+        Action::Set { profile } => profiles
+            .set_active_profile(profile)
+            .map(|()| format!("switched to profile {profile}"))
+            .map_err(|err| {
+                (
+                    format!("failed to switch profile: {err}"),
+                    device::EXIT_FAILED,
+                )
+            }),
     }
-
-    std::process::exit(device::EXIT_OK);
 }

@@ -38,5 +38,9 @@ pub fn run(args: Args) {
     println!("    battery: {}", opened.battery().is_some());
     println!("    profiles: {}", opened.profiles().is_some());
 
+    // Drop the device (and its Transport) explicitly before exiting —
+    // see rgb.rs's `run` for why (ADR 0004, LibusbTransport's Drop
+    // re-attaching the kernel HID driver).
+    drop(opened);
     std::process::exit(device::EXIT_OK);
 }
