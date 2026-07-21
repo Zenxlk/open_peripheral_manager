@@ -3,10 +3,16 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project intends to adhere to [Semantic Versioning](https://semver.org/)
-once it has a first release.
+and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-07-20
+
+First tagged release: workspace scaffolding, device discovery, a
+working HID transport layer, the `Driver`/`Device`/`Capability`
+architecture, and the first real driver (`opm-driver-ajazz-ak820`)
+with solid-color RGB control validated against physical hardware.
 
 ### Added
 
