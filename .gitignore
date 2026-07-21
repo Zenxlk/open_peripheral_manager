@@ -14,3 +14,11 @@
 # analysis (docs/protocols/**/*.md) in git but not the raw dumps.
 docs/protocols/**/captures/*
 !docs/protocols/**/captures/.gitkeep
+
+# Maintainer's personal Rust-learning notes — kept locally, not part of
+# the project's own documentation (see docs/README.md).
+/docs/learning/
+
+# Local Claude Code session settings (permission grants, etc.) — not
+# project configuration.
+/.claude/
