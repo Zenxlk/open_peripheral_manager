@@ -48,6 +48,26 @@ echo -n "<bus>-<port>:1.3" | sudo tee /sys/bus/usb/drivers/usbhid/bind
 A physical unplug/replug does *not* reliably fix this on its own (seen
 in practice) — the manual rebind above does.
 
+## Using lighting effects
+
+```
+pmctl lighting modes                                       # list every mode name
+pmctl lighting set --mode spectrum
+pmctl lighting set --mode breath --color 7c5cff --speed 4
+pmctl lighting set --mode rolling --direction right --speed 2
+```
+
+Same transport, same permissions caveats as "Using RGB control" above
+(`sudo`, or the udev rule). `pmctl rgb set` is now a thin wrapper around
+`pmctl lighting set --mode static` — both go through the same
+`Static`→`Breath(speed=0)` substitution documented in `findings.md`.
+
+**Only `static`/`breath` (via solid-color RGB) are confirmed against
+real hardware as of this writing** — see `findings.md`'s 2026-07-21
+entry. The other 18 modes are wired up and unit-tested against a fake
+transport but not yet run against the physical keyboard; some may need
+their own quirks/substitutions discovered the same way `static` did.
+
 ## Layout
 
 - `captures/` — raw USB/HID captures (`usbmon`, Wireshark/`usbpcap`

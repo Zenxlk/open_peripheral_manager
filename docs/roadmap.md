@@ -248,15 +248,18 @@ record in `findings.md` → extend `protocol.rs` → design/extend the
 against the real keyboard → update this roadmap → split commits, own
 branch + PR.
 
-- [ ] **6a — Lighting modes & animations.** Highest confidence: reuses
-      the already-validated `START`/`MODE`/`data`/`FINISH` transaction
-      and the `LightingMode`/`Direction` vocabulary already ported into
-      `protocol.rs` but unused beyond the `Static`→`Breath` substitution
-      for solid color. Needs a design decision first — today's `Rgb`
-      trait only has `get_color`/`set_color`, no mode/speed/brightness/
-      direction — extend `Rgb` or add a new `Lighting` capability.
-      Validate mode-by-mode against real hardware; some may need their
-      own `Static`-style substitution quirks.
+- [x] **6a — Lighting modes & animations. Implemented, partially
+      validated.** New `Lighting` capability
+      ([ADR 0005](architecture/decisions/0005-lighting-capability-and-shared-effect-vocabulary.md)),
+      `pmctl lighting set --mode <name> [--color/--brightness/--speed/
+      --direction]` and `pmctl lighting modes`. Reuses the already-
+      validated `START`/`MODE`/`data`/`FINISH` transaction; `Rgb::set_color`
+      is now a thin wrapper around it. Only `Static`/`Breath` are
+      confirmed against real hardware so far — the other 18 modes are
+      unit-tested but unvalidated on the physical keyboard; see
+      `protocols/ajazz-ak820/findings.md`'s 2026-07-21 entry for what's
+      still open (rainbow/color-mode byte, per-mode quirks, direction/
+      speed honored as expected).
 - [ ] **6b — `get_color` (read back the current color).** Lower
       confidence — not obviously present in the `GET_REPORT` polling
       traffic captured so far (see Phase 6's findings), and neither

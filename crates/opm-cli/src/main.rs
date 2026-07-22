@@ -32,6 +32,9 @@ enum Command {
     Rgb(commands::rgb::Args),
     /// Manage device profiles.
     Profile(commands::profile::Args),
+    /// Apply an animated lighting effect (mode, brightness, speed,
+    /// direction), beyond a single solid color.
+    Lighting(commands::lighting::Args),
 }
 
 fn main() {
@@ -43,5 +46,6 @@ fn main() {
         Command::Info(args) => commands::info::run(args),
         Command::Rgb(args) => commands::rgb::run(args),
         Command::Profile(args) => commands::profile::run(args),
+        Command::Lighting(args) => commands::lighting::run(args),
     }
 }

@@ -94,7 +94,9 @@ fn act(opened: &dyn opm_core::device::Device, args: Args) -> Result<Option<Strin
     }
 }
 
-fn parse_hex_color(s: &str) -> Result<RgbColor, String> {
+/// Parses `RRGGBB` hex into an [`RgbColor`] — shared with `lighting.rs`'s
+/// `--color` flag.
+pub(super) fn parse_hex_color(s: &str) -> Result<RgbColor, String> {
     let s = s.trim_start_matches('#');
     if s.len() != 6 {
         return Err("expected 6 hex digits, e.g. ff0000".to_owned());

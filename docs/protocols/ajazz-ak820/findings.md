@@ -409,3 +409,59 @@ are prioritized and scoped from this review.
   "wire-format decoded, visibility verification in progress" even after
   substantial effort — a signal that Phase 6h (TFT) should be scoped as
   the hardest sub-phase, not a template to copy directly.
+
+## 2026-07-21 — Phase 6a implemented: full lighting-mode/effect control, `pmctl lighting`
+
+Wired the AK820's already-ported 20-mode vocabulary into a real
+`Capability`. Design decisions and reasoning in full in
+[ADR 0005](../../architecture/decisions/0005-lighting-capability-and-shared-effect-vocabulary.md) —
+summary: a new `Lighting` capability (`opm_core::capability::Lighting`,
+`set_effect(LightingEffect)`) alongside `Rgb`, not merged into it;
+`LightingMode`/`Direction` moved from
+`drivers/opm-driver-ajazz-ak820/src/protocol.rs` into
+`opm_core::capability` since a `Capability` trait's method signatures
+can't reference a driver-private type.
+
+`AjazzAk820Device::set_effect` reuses the exact `START`/`MODE`/data/
+`FINISH` transaction `set_color` already validated (`send`, the same
+`INTER_PACKET_DELAY`/`POST_TRANSACTION_DELAY` timings) — no new
+transport work needed, only a new packet-data shape (arbitrary mode/
+brightness/speed/direction instead of the hardcoded `Breath`/max-
+brightness/zero-speed/left-direction `set_color` always sent).
+`Rgb::set_color` is now a two-line wrapper around `set_effect` with
+`mode: LightingMode::Static` — confirmed behavior-identical by the
+existing `set_color` unit test passing unchanged (same exact 4-packet
+byte sequence asserted before this change).
+
+New `pmctl lighting set --mode <name> [--color RRGGBB] [--brightness N]
+[--speed N] [--direction <name>]` and `pmctl lighting modes` (lists all
+20 names, no device needed). See
+`docs/protocols/ajazz-ak820/README.md`'s new "Using lighting effects"
+section for example commands.
+
+**Not yet run against real hardware.** Only `Static` (via `Rgb::set_color`,
+already validated) and `Breath` (via the `Static`→`Breath` substitution,
+same code path) are confirmed working. The other 18 modes are unit-
+tested against a fake `Transport` (mode byte, speed, direction land in
+the right packet offsets — `set_effect_passes_other_modes_through_unmodified`)
+but their actual on-device behavior is unknown: whether they render as
+expected, whether any of them has its own `Static`-style quirk
+requiring a substitution, and whether `direction`/`speed` are honored
+the way `LightingMode::supported_directions` assumes (ported from gohv,
+never independently confirmed against this project's own captures).
+
+**Known gaps, carried forward:**
+- Needs a real `pmctl lighting set --mode <X>` run per mode (or at
+  least a representative sample — one non-directional animation, one
+  directional one, one reactive one like `single-on`) before Phase 6a
+  counts as validated, matching every other phase's discipline.
+- `rainbow`/`color_mode` (payload byte 8, currently always sent as
+  `false`/`0`) is still unexplored — `ak820pro-modder`'s `PROTOCOL.md`
+  documents an analogous `colorMode: u8` field on *their* protocol as
+  "multi-state, not boolean," which may or may not carry over; not
+  investigated on our own protocol.
+- `LightingEffect::brightness`/`speed` accept any `u8`; the driver
+  clamps to `MAX_BRIGHTNESS`/`MAX_SPEED` (5) silently rather than
+  erroring on an out-of-range CLI value — matches `protocol.rs`'s
+  existing clamp-not-error behavior from the solid-color path, not a
+  new decision.
