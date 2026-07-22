@@ -343,3 +343,69 @@ orphaning bug fix #3 solved.
   kernel-driver-detach approach itself (ADR 0004's "Consequences"),
   not fully eliminated, only worked around at every currently-known
   call site.
+
+## 2026-07-21 — Reviewed `wsclx/ak820pro-modder`: a third community project, incompatible wire protocol
+
+Cloned and read [`wsclx/ak820pro-modder`](https://github.com/wsclx/ak820pro-modder)
+(MIT license, `LICENSE` file present and GitHub-recognized — unlike
+gohv/TaxMachine) to scope out what's left of this project's Phase 6:
+lighting modes/animations, per-key RGB, keymap, macros, sleep timer,
+profiles, TFT. It's the most feature-complete of the three community
+projects found so far — a Tauri 2 (Rust + React) app targeting macOS,
+with a pure-Rust `ak820-protocol` crate organized one module per
+command family (`lighting.rs`, `keymap.rs`, `macros.rs`,
+`per_key_rgb.rs`, `sleep.rs`, `system.rs`, `tft.rs`, `clock.rs`) and a
+living `docs/PROTOCOL.md` documenting every decoded command — a similar
+discipline to this directory's own `findings.md`/`README.md` split.
+
+**Its wire protocol is a different family from gohv/TaxMachine's (the
+one this project has already validated against real `0x800a`
+hardware), not a variant of it.** Confirmed by reading its own
+`docs/PROTOCOL.md`, which documents this explicitly under "Where the
+upstream Linux ports went wrong": it targets PID `0x8009` against the
+official AJAZZ driver on macOS firmware 1.07, and found that
+gohv/TaxMachine's entire framing — Feature reports, `0x04` control
+report ID, `START`(0x18)/`MODE`(0x13)/`FINISH`(0xf0), the 64-byte
+mode-data payload — "is silently ignored by strict firmware 1.07 on
+macOS". Its replacement format uses plain HID **output** reports
+(report ID `0`, no Feature reports, no kernel-driver detachment needed
+on macOS), a single `0xAA`-magic frame per command
+(`[0xAA, cmd, len, addr_lo, addr_hi, opt0, opt1/last-flag, opt2,
+payload…]`), and a completely different command byte table
+(`SET_LED_EFFECT = 0x23`, `GET_LED_EFFECT = 0x13` — notably the same
+numeric value TaxMachine used for `CMD_MODE`, apparently coincidence:
+different command, different framing, different transport).
+
+This is the mirror image of this project's own experience — where
+gohv/TaxMachine's protocol is exactly what worked, validated with four
+real color changes on our physical `0x800a` unit (see the two entries
+above). Neither side's project is wrong; **two firmware/hardware
+variants of the same Sonix SN32F299-based board genuinely speak
+different wire protocols**, distinguished at minimum by PID (`0x8009`
+vs `0x800a`) and possibly by OS-side transport differences (macOS
+IOHIDDevice vs Linux hidraw/libusb) that haven't been isolated from the
+firmware difference.
+
+**Conclusion: nothing from `ak820pro-modder` gets ported byte-for-byte
+into this project.** Its value here is as a **feature-scope and
+code-organization reference** — confirms which command families exist
+on this keyboard family in general (lighting modes, per-key RGB,
+keymap incl. Fn layer, macros, sleep timer, onboard profiles, TFT
+upload), and its per-family module split is a reasonable shape to
+mirror in `protocol.rs` as this project's own Phase 6 sub-phases grow —
+but every opcode and byte offset still needs its own capture against
+our real `0x800a` unit. `docs/roadmap.md`'s Phase 6 sub-phases (6a-6h)
+are prioritized and scoped from this review.
+
+**Known gaps, carried forward:**
+- Whether the protocol difference is purely firmware-version-driven
+  (i.e. a `0x800a` unit could theoretically be re-flashed to speak
+  `ak820pro-modder`'s protocol, or vice versa) or tied to the PID/
+  hardware revision itself is unconfirmed and not worth investigating —
+  out of scope, this project targets the real unit's protocol as-is.
+- `ak820pro-modder`'s TFT work (`docs/PROTOCOL.md`'s `SET_TFT_USER_ANIMATION`
+  section) is the most detailed public documentation of an AK820-family
+  TFT upload found so far, but the project's own README marks it 🚧
+  "wire-format decoded, visibility verification in progress" even after
+  substantial effort — a signal that Phase 6h (TFT) should be scoped as
+  the hardest sub-phase, not a template to copy directly.
