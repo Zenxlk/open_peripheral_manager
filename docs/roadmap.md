@@ -211,15 +211,81 @@ back are still open. Figure out the AK820's actual vendor protocol
       subsystem udev rule (`protocols/ajazz-ak820/99-ak820-usb.rules`)
       doesn't visibly grant access the way Phase 2's `hidraw` rule does;
       not diagnosed further, see findings.md's known gaps.
-- [ ] Figure out `get_color` (reading the current color back) — not
-      obviously present in the `GET_REPORT` polling traffic captured so
-      far, and neither reference project reads color back either.
-- [ ] Capture and decode profile switching (`Profiles`), sleep timer,
-      and clock sync — `protocol.rs` already carries the vocabulary for
-      the first two (ported from gohv), not yet wired into any
-      `Capability`.
 - [ ] `LibusbTransport::write_output`/`read_input` (interrupt-endpoint
       I/O) are implemented but never exercised against real hardware.
+
+### Reference reviewed: `wsclx/ak820pro-modder`
+
+Reviewed [`wsclx/ak820pro-modder`](https://github.com/wsclx/ak820pro-modder)
+(macOS/Tauri, MIT-licensed) as a third community project for this
+keyboard family — much broader feature coverage than gohv/TaxMachine
+(per-key RGB, keymap, macros, TFT, system info). **Its wire protocol is
+not compatible with ours and must not be ported byte-for-byte**: it
+targets PID `0x8009` on macOS firmware 1.07 with a fundamentally
+different transport (hidapi output reports + interrupt-IN responses, a
+single `0xAA`-magic frame per command) versus our validated PID
+`0x800a` protocol (Feature reports over `LibusbTransport`, the
+`START`/`MODE`/`data`/`FINISH` four-packet transaction). Its own docs
+note gohv/TaxMachine's protocol "is silently ignored by firmware 1.07
+on macOS" — the mirror image of our own experience, where gohv's
+protocol is exactly what worked. Two firmware/hardware variants of the
+same chip, not a bug in either project. See `protocols/ajazz-ak820/
+findings.md`'s 2026-07-21 entry for the full comparison and credit.
+
+Used here only as a **feature-scope and code-organization reference**
+— the command families below, and the precedent of a per-family module
+under `protocol.rs`/a living `PROTOCOL.md`-style doc — not as a source
+of opcodes or byte layouts, all of which still need their own capture
++ decode against our real `0x800a` unit.
+
+### Sub-phases, in priority order
+
+Each follows the same discipline as solid-color RGB: capture (Windows
+VM + Wireshark, see `protocols/ajazz-ak820/README.md`) → decode and
+record in `findings.md` → extend `protocol.rs` → design/extend the
+`Capability` trait it needs (own ADR if it's a new trait, per
+`driver-model.md`) → wire into the driver and `pmctl` → validate
+against the real keyboard → update this roadmap → split commits, own
+branch + PR.
+
+- [ ] **6a — Lighting modes & animations.** Highest confidence: reuses
+      the already-validated `START`/`MODE`/`data`/`FINISH` transaction
+      and the `LightingMode`/`Direction` vocabulary already ported into
+      `protocol.rs` but unused beyond the `Static`→`Breath` substitution
+      for solid color. Needs a design decision first — today's `Rgb`
+      trait only has `get_color`/`set_color`, no mode/speed/brightness/
+      direction — extend `Rgb` or add a new `Lighting` capability.
+      Validate mode-by-mode against real hardware; some may need their
+      own `Static`-style substitution quirks.
+- [ ] **6b — `get_color` (read back the current color).** Lower
+      confidence — not obviously present in the `GET_REPORT` polling
+      traffic captured so far (see Phase 6's findings), and neither
+      gohv nor ak820pro-modder read color back either on their own
+      protocols. May end up simply unsupported.
+- [ ] **6c — Sleep timer.** `protocol.rs` already has `SleepTime` and
+      `CMD_SLEEP = 0x17` ported from gohv; needs wiring into a
+      `Capability` and real-hardware validation, no new capture
+      expected.
+- [ ] **6d — Onboard profile switching (`Profiles`).** Needs a new
+      capture — nothing about it has been decoded for our protocol yet,
+      despite the `Profiles` capability trait already existing
+      (Phase 3) and the driver already exposing it (Phase 4, still
+      stubbed).
+- [ ] **6e — Per-key RGB.** New capture + decode required. High value,
+      new `Capability` trait needed (see ak820pro-modder's
+      `CustomLedMap`/`SET_CUSTOM_LED_DATA` for the *shape* of the
+      problem — 128 LEDs, not the byte layout).
+- [ ] **6f — Keymap remapping.** New capture + decode required. Large
+      scope (128 slots × base + Fn layers); biggest single feature
+      after lighting.
+- [ ] **6g — Macros.** New capture + decode required. Large scope,
+      lower priority than keymap.
+- [ ] **6h — TFT display / clock sync.** Confirmed relevant — this
+      unit has the 0.85" display. Deliberately last: ak820pro-modder's
+      own TFT work (the most mature public reference available) is
+      still marked 🚧 "wire-format decoded, visibility verification in
+      progress" after significant effort, so expect this to be the
+      hardest and most speculative sub-phase. No capture attempted yet.
 
 ## Phase 7 — GUI
 
