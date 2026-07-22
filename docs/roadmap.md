@@ -265,15 +265,25 @@ branch + PR.
       traffic captured so far (see Phase 6's findings), and neither
       gohv nor ak820pro-modder read color back either on their own
       protocols. May end up simply unsupported.
-- [ ] **6c — Sleep timer.** `protocol.rs` already has `SleepTime` and
-      `CMD_SLEEP = 0x17` ported from gohv; needs wiring into a
-      `Capability` and real-hardware validation, no new capture
-      expected.
+- [ ] **6c — Sleep timer. Implemented, pending real-hardware
+      validation.** New `SleepTimer` capability
+      (`opm_core::capability::SleepTimer`/`SleepTime`, same pattern as
+      `Lighting`/ADR 0005), `pmctl sleep set <preset>`/`pmctl sleep
+      presets`. Full packet layout (`sleep_data_packet`, a `byte2`
+      field on `control_packet` not needed by lighting) ported from
+      gohv's own already-implemented sleep timer — no new capture
+      needed, same as predicted. Transaction shape differs from
+      lighting's: `START`/`SLEEP`-preamble/data, no `FINISH` packet.
+      Unit-tested against a fake transport; not yet run against the
+      physical keyboard.
 - [ ] **6d — Onboard profile switching (`Profiles`).** Needs a new
       capture — nothing about it has been decoded for our protocol yet,
       despite the `Profiles` capability trait already existing
       (Phase 3) and the driver already exposing it (Phase 4, still
-      stubbed).
+      stubbed). Unlike 6c, gohv doesn't implement this either (confirmed
+      by inspecting its source — no profile-related code at all), so
+      there's no reference protocol to port; needs its own Wireshark
+      capture session.
 - [ ] **6e — Per-key RGB.** New capture + decode required. High value,
       new `Capability` trait needed (see ak820pro-modder's
       `CustomLedMap`/`SET_CUSTOM_LED_DATA` for the *shape* of the

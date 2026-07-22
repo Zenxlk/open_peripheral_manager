@@ -465,3 +465,56 @@ never independently confirmed against this project's own captures).
   erroring on an out-of-range CLI value — matches `protocol.rs`'s
   existing clamp-not-error behavior from the solid-color path, not a
   new decision.
+
+## 2026-07-21 — Phase 6c implemented: sleep timer, ported from gohv (no new capture needed)
+
+Unlike lighting, gohv/EPOMAKER-Ajazz-AK820-Pro's sleep timer is
+**fully implemented** in its own source (`src/protocol.rs`'s
+`sleep_preamble_packet`/`sleep_data_packet`, `src/usb.rs`'s
+`set_sleep_time`) — re-read it directly (already cloned locally from
+the earlier root-cause investigation) rather than re-deriving from a
+fresh capture, the same way `set_color`'s bytes were ported.
+
+Two things this transaction does differently from lighting's, both
+ported as-is since gohv's lighting bytes transferred byte-exact to our
+`0x800a` unit already:
+
+1. **`control_packet` needed a `byte2` field.** Every lighting-related
+   control packet (`START`/`MODE`/`FINISH`) always carried `byte2 = 0`,
+   which is why this project's `control_packet(command, byte8)` never
+   had a parameter for it — but gohv's `sleep_preamble_packet` sends
+   `byte2 = 0x01`. Extended the signature to
+   `control_packet(command, byte2, byte8)`; existing callers updated to
+   pass `0x00`, preserving their exact prior byte layout (confirmed by
+   the existing `set_color`/`set_effect` unit tests passing unchanged).
+2. **No `FINISH` packet.** `set_sleep_time` sends `START` → `SLEEP`
+   preamble → sleep-data, then just waits — never `FINISH`. Ported
+   verbatim; not something this project derived or guessed at.
+
+`sleep_data_packet`'s footer is also positioned differently from
+`mode_data_packet`'s: `0xaa 0x55` at the packet's *last* two bytes
+(62-63) versus `0x55 0xaa` at bytes 14-15 for lighting — another
+data point for the "per-command-family footer, meaning unknown"
+category `findings.md` already tracks for the `05 03`/`AA 55` bytes.
+
+New `opm_core::capability::SleepTimer`/`SleepTime` (mirroring
+`Lighting`/`LightingMode`'s ADR 0005 pattern — no new ADR written for
+this one; the design questions it would answer were already settled by
+ADR 0005's precedent). `pmctl sleep set <preset>` / `pmctl sleep
+presets`.
+
+**Not yet run against real hardware.** Unit-tested against a fake
+`Transport` only (`set_sleep_time_sends_start_sleep_data_with_no_finish`
+asserts the exact 3-packet sequence and that only the two
+`CONTROL_REPORT_ID` packets get a `GET_REPORT` handshake).
+
+**Known gaps, carried forward:**
+- Needs a real `pmctl sleep set <preset>` run — ideally leaving the
+  keyboard idle long enough to observe the lighting actually sleep on
+  schedule, not just that the command exits `0`.
+- No way to *read back* the current sleep timer setting — `GameMode`-
+  style device info (`ak820pro-modder`'s `GET_GAME_MODE`) isn't decoded
+  for our protocol; `SleepTimer` is write-only, same shape as `Lighting`.
+- `byte2`'s meaning across command families (`0x00` vs `0x01` vs
+  ak820pro-modder's own unrelated `addr`/`len` fields on a completely
+  different protocol) is still not understood, just empirically ported.
