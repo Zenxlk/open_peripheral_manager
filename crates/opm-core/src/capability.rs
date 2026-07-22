@@ -63,6 +63,60 @@ pub trait Lighting: Send {
     fn set_effect(&self, effect: LightingEffect) -> Result<(), Error>;
 }
 
+/// Devices with an idle timer that puts their lighting to sleep after a
+/// period of inactivity.
+///
+/// Same reasoning as [`Lighting`] (see ADR 0005): a separate capability
+/// rather than folding into `Lighting`, since not every lighting-capable
+/// device necessarily has an idle timer, and [`SleepTime`]'s vocabulary
+/// is shaped around what the AK820 exposes today.
+pub trait SleepTimer: Send {
+    /// Sets how long the device stays idle before its lighting sleeps.
+    fn set_sleep_time(&self, time: SleepTime) -> Result<(), Error>;
+}
+
+/// How long a device waits, idle, before its lighting sleeps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum SleepTime {
+    /// Never sleep.
+    Never = 0,
+    /// Sleep after one minute idle.
+    OneMinute = 1,
+    /// Sleep after five minutes idle.
+    FiveMinutes = 2,
+    /// Sleep after thirty minutes idle.
+    ThirtyMinutes = 3,
+}
+
+impl SleepTime {
+    /// Every preset.
+    pub const ALL: &'static [SleepTime] = &[
+        Self::Never,
+        Self::OneMinute,
+        Self::FiveMinutes,
+        Self::ThirtyMinutes,
+    ];
+
+    /// A lowercase-hyphenated name, for CLI display/parsing.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Never => "never",
+            Self::OneMinute => "1m",
+            Self::FiveMinutes => "5m",
+            Self::ThirtyMinutes => "30m",
+        }
+    }
+
+    /// Parses [`Self::name`]'s output back into a preset, case-insensitive.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL
+            .iter()
+            .find(|t| t.name().eq_ignore_ascii_case(name))
+            .copied()
+    }
+}
+
 /// A full lighting effect: which [`LightingMode`] to run, its color, and
 /// its brightness/speed/direction. `brightness`/`speed` are raw,
 /// device-specific ranges (0-5 on the AK820 today) — see ADR 0005 for
@@ -277,5 +331,17 @@ mod tests {
     #[test]
     fn direction_from_name_rejects_unknown() {
         assert_eq!(Direction::from_name("sideways"), None);
+    }
+
+    #[test]
+    fn sleep_time_name_round_trips() {
+        for time in SleepTime::ALL {
+            assert_eq!(SleepTime::from_name(time.name()), Some(*time));
+        }
+    }
+
+    #[test]
+    fn sleep_time_from_name_rejects_unknown() {
+        assert_eq!(SleepTime::from_name("2 hours"), None);
     }
 }
