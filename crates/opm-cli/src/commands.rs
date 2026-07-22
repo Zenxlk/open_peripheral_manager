@@ -4,6 +4,7 @@
 mod device;
 pub mod discover;
 pub mod info;
+pub mod lighting;
 pub mod list;
 pub mod profile;
 mod registry;
