@@ -1,4 +1,4 @@
-//! AK820 lighting-mode vocabulary and packet layout.
+//! AK820 wire-level packet layout.
 //!
 //! Ported from [gohv/EPOMAKER-Ajazz-AK820-Pro](https://github.com/gohv/EPOMAKER-Ajazz-AK820-Pro)'s
 //! `src/protocol.rs` (itself built on
@@ -12,12 +12,16 @@
 //! protocol facts they discovered (opcodes, byte offsets, enum
 //! values), not a copy of their source files.
 //!
-//! Only a solid color (via `lib.rs`'s `LightingMode::Static` →
-//! `LightingMode::Breath` substitution) is wired into a real
-//! `Capability` so far (`Rgb::set_color`). The rest of this vocabulary
-//! — every other lighting mode, [`Direction`], [`SleepTime`] — is
-//! carried over ready to use, but nothing in `opm_core::capability`
-//! exposes them yet; see `docs/roadmap.md`'s Phase 6 known gaps.
+//! The mode/direction vocabulary itself
+//! (`LightingMode`/`Direction`/`LightingEffect`) moved to
+//! `opm_core::capability` as of
+//! `docs/architecture/decisions/0005-lighting-capability-and-shared-effect-vocabulary.md`
+//! — this module now only owns what's genuinely wire-specific: the
+//! control-packet command bytes and the two packet-layout builders.
+//! [`SleepTime`] stays here, not yet wired into any `Capability`
+//! (Phase 6c, not started).
+
+use opm_core::capability::{Direction, LightingMode};
 
 /// The Report ID shared by every `START`/`START_MODE`/`FINISH`/`SLEEP`
 /// control packet — distinct from a lighting-data packet's Report ID,
@@ -38,70 +42,6 @@ pub const CMD_SLEEP: u8 = 0x17;
 pub const MAX_BRIGHTNESS: u8 = 5;
 /// The highest animation-speed value the device accepts.
 pub const MAX_SPEED: u8 = 5;
-
-/// Every lighting effect the AK820 (Pro and this project's `0x800a`
-/// unit alike) exposes. Numeric values are the wire opcode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum LightingMode {
-    /// Lighting off entirely.
-    Off = 0x00,
-    /// A single solid color. Requesting this directly does not work on
-    /// real hardware — see `lib.rs`'s `Static` → `Breath` substitution.
-    Static = 0x01,
-    /// A single key lit on press.
-    SingleOn = 0x02,
-    /// A single key lit, then turned off on press.
-    SingleOff = 0x03,
-    /// Random keys glittering.
-    Glittering = 0x04,
-    /// A falling-keys animation.
-    Falling = 0x05,
-    /// A colorful, multi-hue animation.
-    Colourful = 0x06,
-    /// A breathing (fade in/out) effect. `speed = 0` renders as a
-    /// static color — the substitution `Static` actually uses.
-    Breath = 0x07,
-    /// A spectrum-cycling animation.
-    Spectrum = 0x08,
-    /// An animation radiating outward from the center.
-    Outward = 0x09,
-    /// A scrolling animation; supports [`Direction::Up`]/[`Direction::Down`].
-    Scrolling = 0x0a,
-    /// A rolling animation; supports [`Direction::Left`]/[`Direction::Right`].
-    Rolling = 0x0b,
-    /// A rotating animation.
-    Rotating = 0x0c,
-    /// An exploding animation.
-    Explode = 0x0d,
-    /// A launching animation.
-    Launch = 0x0e,
-    /// A ripple animation.
-    Ripples = 0x0f,
-    /// A flowing animation; supports [`Direction::Left`]/[`Direction::Right`].
-    Flowing = 0x10,
-    /// A pulsating animation.
-    Pulsating = 0x11,
-    /// A tilt animation; supports [`Direction::Left`]/[`Direction::Right`].
-    Tilt = 0x12,
-    /// A shuttle animation.
-    Shuttle = 0x13,
-}
-
-/// The direction an animated [`LightingMode`] runs in, for the modes
-/// that support one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Direction {
-    /// Leftward.
-    Left = 0,
-    /// Downward.
-    Down = 1,
-    /// Upward.
-    Up = 2,
-    /// Rightward.
-    Right = 3,
-}
 
 /// How long the keyboard stays idle before its lighting sleeps. Not
 /// wired into a `Capability` yet — see the module docs.

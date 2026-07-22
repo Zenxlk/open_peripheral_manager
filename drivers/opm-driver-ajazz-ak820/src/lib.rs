@@ -9,20 +9,21 @@
 //! prove discovery → transport → driver → capability plumbing works
 //! end-to-end against the real device.
 
-use opm_core::capability::{Profiles, Rgb, RgbColor};
+use opm_core::capability::{
+    Direction, Lighting, LightingEffect, LightingMode, Profiles, Rgb, RgbColor,
+};
 use opm_core::device::Device;
 use opm_core::driver::Driver;
 use opm_core::error::Error;
 use opm_core::identity::{Identity, Interface, UsagePair};
 use opm_core::transport::Transport;
 
-/// The AK820's lighting-mode vocabulary and packet layout — public so
-/// other code (a future GUI, another capability implementation) can
-/// build on the full mode/direction/sleep-timer catalog this crate
-/// carries even though only `Static` is wired into a `Capability` so
-/// far. See the module's own docs for credits.
+/// The AK820's wire-level packet layout — public so other code (a
+/// future GUI, another capability implementation) can build on the
+/// sleep-timer catalog this crate carries even though it isn't wired
+/// into a `Capability` yet. See the module's own docs for credits.
 pub mod protocol;
-use protocol::{CONTROL_REPORT_ID, Direction, LightingMode, control_packet, mode_data_packet};
+use protocol::{CONTROL_REPORT_ID, control_packet, mode_data_packet};
 
 /// USB vendor id. `0x0c45` is Sonix Technology, the OEM controller
 /// vendor, not Ajazz itself — see
@@ -122,6 +123,10 @@ impl Device for AjazzAk820Device {
     fn profiles(&self) -> Option<&dyn Profiles> {
         Some(self)
     }
+
+    fn lighting(&self) -> Option<&dyn Lighting> {
+        Some(self)
+    }
 }
 
 /// A single message shared by every capability stub below: the real
@@ -181,23 +186,43 @@ impl Rgb for AjazzAk820Device {
     }
 
     fn set_color(&self, color: RgbColor) -> Result<(), Error> {
-        // Requesting LightingMode::Static (0x01) directly does not
-        // work on this hardware — an empirically-found substitution,
-        // not understood, see findings.md. Breath with speed = 0
-        // produces a static-looking color instead.
+        self.set_effect(LightingEffect {
+            mode: LightingMode::Static,
+            color,
+            brightness: protocol::MAX_BRIGHTNESS,
+            speed: 0,
+            direction: Direction::Left,
+        })
+    }
+}
+
+impl Lighting for AjazzAk820Device {
+    fn set_effect(&self, effect: LightingEffect) -> Result<(), Error> {
+        // Requesting LightingMode::Static (0x01) directly does not work
+        // on this hardware — an empirically-found substitution, not
+        // understood, see findings.md. Breath with speed = 0 produces a
+        // static-looking color instead. Every other mode goes out as
+        // requested — validated against real hardware for Static/Breath
+        // only so far, see findings.md's 2026-07-21 entry.
+        let (wire_mode, speed) = if effect.mode == LightingMode::Static {
+            (LightingMode::Breath, 0)
+        } else {
+            (effect.mode, effect.speed)
+        };
+
         send(&*self.vendor, control_packet(protocol::CMD_START, 0x01))?;
         send(&*self.vendor, control_packet(protocol::CMD_MODE, 0x01))?;
         send(
             &*self.vendor,
             mode_data_packet(
-                LightingMode::Breath,
-                color.r,
-                color.g,
-                color.b,
+                wire_mode,
+                effect.color.r,
+                effect.color.g,
+                effect.color.b,
                 false,
-                protocol::MAX_BRIGHTNESS,
-                0,
-                Direction::Left,
+                effect.brightness,
+                speed,
+                effect.direction,
             ),
         )?;
         send(&*self.vendor, control_packet(protocol::CMD_FINISH, 0x01))?;
@@ -424,5 +449,58 @@ mod tests {
             get_feature_report_ids.lock().unwrap().as_slice(),
             &[CONTROL_REPORT_ID, CONTROL_REPORT_ID, CONTROL_REPORT_ID]
         );
+    }
+
+    #[test]
+    fn set_effect_substitutes_static_for_breath_speed_zero() {
+        let transport = FakeTransport::default();
+        let set_feature_calls = transport.set_feature_calls.clone();
+        let device = AjazzAk820Device {
+            identity: real_ak820_identity(),
+            vendor: Box::new(transport),
+        };
+
+        device
+            .set_effect(LightingEffect {
+                mode: LightingMode::Static,
+                color: RgbColor { r: 1, g: 2, b: 3 },
+                brightness: 5,
+                speed: 4,
+                direction: Direction::Right,
+            })
+            .expect("set_effect should succeed against a fake transport");
+
+        let calls = set_feature_calls.lock().unwrap();
+        // Data packet is the third call — mode byte 0 must be Breath
+        // (0x07), not the requested Static (0x01), and speed must be
+        // forced to 0 regardless of the caller's requested speed.
+        assert_eq!(calls[2].0, LightingMode::Breath as u8);
+        assert_eq!(calls[2].1[9], 0); // speed
+    }
+
+    #[test]
+    fn set_effect_passes_other_modes_through_unmodified() {
+        let transport = FakeTransport::default();
+        let set_feature_calls = transport.set_feature_calls.clone();
+        let device = AjazzAk820Device {
+            identity: real_ak820_identity(),
+            vendor: Box::new(transport),
+        };
+
+        device
+            .set_effect(LightingEffect {
+                mode: LightingMode::Spectrum,
+                color: RgbColor { r: 1, g: 2, b: 3 },
+                brightness: 5,
+                speed: 4,
+                direction: Direction::Right,
+            })
+            .expect("set_effect should succeed against a fake transport");
+
+        let calls = set_feature_calls.lock().unwrap();
+        let data_packet = &calls[2];
+        assert_eq!(data_packet.0, LightingMode::Spectrum as u8);
+        assert_eq!(data_packet.1[9], 4); // speed, unmodified (pkt[10], shifted by the report-id byte)
+        assert_eq!(data_packet.1[10], Direction::Right as u8); // pkt[11]
     }
 }
