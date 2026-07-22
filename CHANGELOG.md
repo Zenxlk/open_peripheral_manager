@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-21
+
+Phase 6a/6c: the AK820's full lighting-mode vocabulary and its sleep
+timer, both validated against physical hardware. No breaking changes —
+every addition is a new, optional `Capability`.
+
+### Added
+
+- Phase 6a (lighting modes & animations): `opm_core::capability::Lighting`
+  (`set_effect`), a new capability alongside `Rgb` for animated effects
+  — mode, color, brightness, speed, direction — beyond a single solid
+  color. `LightingMode` (all 20 AK820 modes), `Direction`, and
+  `LightingEffect` live in `opm-core` as shared vocabulary; see
+  [ADR 0005](docs/architecture/decisions/0005-lighting-capability-and-shared-effect-vocabulary.md)
+  for why this is a separate capability and why the vocabulary isn't a
+  guessed-at cross-vendor generalization.
+  - `AjazzAk820Device::set_effect` reuses the already-validated
+    `START`/`MODE`/data/`FINISH` transaction; `Rgb::set_color` is now a
+    thin wrapper around it (`mode: Static`, still substituted for
+    `Breath(speed=0)` on the wire).
+  - `pmctl lighting set --mode <name> [--color/--brightness/--speed/
+    --direction]` and `pmctl lighting modes`.
+  - Validated against real hardware across a representative sample of
+    modes — see `docs/protocols/ajazz-ak820/findings.md`'s 2026-07-21
+    entries.
+- Phase 6c (sleep timer): `opm_core::capability::SleepTimer`
+  (`set_sleep_time`)/`SleepTime`, same design pattern as `Lighting`.
+  - `AjazzAk820Device::set_sleep_time`, ported directly from
+    gohv/EPOMAKER-Ajazz-AK820-Pro's own already-decoded sleep timer —
+    no new capture needed. Its transaction shape differs from
+    lighting's: a `byte2` field on `control_packet` lighting never
+    needed, and no `FINISH` packet at the end.
+  - `pmctl sleep set <preset>` and `pmctl sleep presets`.
+  - Validated against real hardware.
+- Reviewed a third community reference,
+  [`wsclx/ak820pro-modder`](https://github.com/wsclx/ak820pro-modder),
+  for Phase 6's remaining scope (per-key RGB, keymap, macros, profiles,
+  TFT). Its wire protocol targets a different PID (`0x8009`) with a
+  fundamentally different transport than this project's validated
+  `0x800a` protocol, so nothing from it is ported directly — used only
+  to prioritize `docs/roadmap.md`'s remaining Phase 6 sub-phases
+  (6b-6h) and to confirm that none of the three known community
+  references (gohv, TaxMachine, ak820pro-modder) have onboard profile
+  switching decoded, ahead of Phase 6d.
+
 ## [0.1.0] - 2026-07-20
 
 First tagged release: workspace scaffolding, device discovery, a
