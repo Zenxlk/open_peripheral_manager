@@ -265,17 +265,15 @@ branch + PR.
       traffic captured so far (see Phase 6's findings), and neither
       gohv nor ak820pro-modder read color back either on their own
       protocols. May end up simply unsupported.
-- [ ] **6c — Sleep timer. Implemented, pending real-hardware
-      validation.** New `SleepTimer` capability
+- [x] **6c — Sleep timer. Done, validated against real hardware.** New
+      `SleepTimer` capability
       (`opm_core::capability::SleepTimer`/`SleepTime`, same pattern as
       `Lighting`/ADR 0005), `pmctl sleep set <preset>`/`pmctl sleep
       presets`. Full packet layout (`sleep_data_packet`, a `byte2`
       field on `control_packet` not needed by lighting) ported from
       gohv's own already-implemented sleep timer — no new capture
-      needed, same as predicted. Transaction shape differs from
+      needed, confirming the prediction. Transaction shape differs from
       lighting's: `START`/`SLEEP`-preamble/data, no `FINISH` packet.
-      Unit-tested against a fake transport; not yet run against the
-      physical keyboard.
 - [ ] **6d — Onboard profile switching (`Profiles`).** Needs a new
       capture — nothing about it has been decoded for our protocol yet,
       despite the `Profiles` capability trait already existing

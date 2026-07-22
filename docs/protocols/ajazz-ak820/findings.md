@@ -503,15 +503,11 @@ this one; the design questions it would answer were already settled by
 ADR 0005's precedent). `pmctl sleep set <preset>` / `pmctl sleep
 presets`.
 
-**Not yet run against real hardware.** Unit-tested against a fake
-`Transport` only (`set_sleep_time_sends_start_sleep_data_with_no_finish`
-asserts the exact 3-packet sequence and that only the two
-`CONTROL_REPORT_ID` packets get a `GET_REPORT` handshake).
+**Update 2026-07-21, later the same day — validated against real
+hardware.** Ran `pmctl sleep set <preset>` against the physical
+AK820 — confirmed working. Phase 6c counts as done.
 
 **Known gaps, carried forward:**
-- Needs a real `pmctl sleep set <preset>` run — ideally leaving the
-  keyboard idle long enough to observe the lighting actually sleep on
-  schedule, not just that the command exits `0`.
 - No way to *read back* the current sleep timer setting — `GameMode`-
   style device info (`ak820pro-modder`'s `GET_GAME_MODE`) isn't decoded
   for our protocol; `SleepTimer` is write-only, same shape as `Lighting`.

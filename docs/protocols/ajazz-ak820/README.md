@@ -74,8 +74,7 @@ pmctl sleep set 5m
 
 Same transport/permissions as above. Ported from gohv's own already-
 decoded sleep timer (no new capture needed — see `findings.md`'s
-2026-07-21 6c entry). **Not yet run against real hardware** — unit-
-tested against a fake transport only.
+2026-07-21 6c entry) and validated against real hardware.
 
 ## Layout
 
