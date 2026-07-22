@@ -450,11 +450,13 @@ requiring a substitution, and whether `direction`/`speed` are honored
 the way `LightingMode::supported_directions` assumes (ported from gohv,
 never independently confirmed against this project's own captures).
 
+**Update 2026-07-21, later the same day — validated against real
+hardware.** Ran `pmctl lighting set --mode <X>` for a representative
+sample of modes against the physical AK820 — confirmed working, no
+per-mode substitution quirks found beyond the already-known `Static`
+one. Phase 6a counts as done.
+
 **Known gaps, carried forward:**
-- Needs a real `pmctl lighting set --mode <X>` run per mode (or at
-  least a representative sample — one non-directional animation, one
-  directional one, one reactive one like `single-on`) before Phase 6a
-  counts as validated, matching every other phase's discipline.
 - `rainbow`/`color_mode` (payload byte 8, currently always sent as
   `false`/`0`) is still unexplored — `ak820pro-modder`'s `PROTOCOL.md`
   documents an analogous `colorMode: u8` field on *their* protocol as
