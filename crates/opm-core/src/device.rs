@@ -7,7 +7,7 @@
 //! a device exclusively through this trait plus whichever optional
 //! capability traits ([`crate::capability`]) it chooses to expose.
 
-use crate::capability::{Battery, Lighting, Profiles, Rgb};
+use crate::capability::{Battery, Lighting, Profiles, Rgb, SleepTimer};
 use crate::identity::Identity;
 
 /// A live handle to an opened peripheral.
@@ -35,6 +35,11 @@ pub trait Device: Send {
     /// `Some` if this device supports animated lighting effects beyond
     /// a single solid color (see [`crate::capability::Lighting`]).
     fn lighting(&self) -> Option<&dyn Lighting> {
+        None
+    }
+    /// `Some` if this device supports an idle lighting sleep timer (see
+    /// [`crate::capability::SleepTimer`]).
+    fn sleep_timer(&self) -> Option<&dyn SleepTimer> {
         None
     }
 }

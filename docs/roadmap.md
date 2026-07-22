@@ -264,15 +264,27 @@ branch + PR.
       traffic captured so far (see Phase 6's findings), and neither
       gohv nor ak820pro-modder read color back either on their own
       protocols. May end up simply unsupported.
-- [ ] **6c — Sleep timer.** `protocol.rs` already has `SleepTime` and
-      `CMD_SLEEP = 0x17` ported from gohv; needs wiring into a
-      `Capability` and real-hardware validation, no new capture
-      expected.
+- [x] **6c — Sleep timer. Done, validated against real hardware.** New
+      `SleepTimer` capability
+      (`opm_core::capability::SleepTimer`/`SleepTime`, same pattern as
+      `Lighting`/ADR 0005), `pmctl sleep set <preset>`/`pmctl sleep
+      presets`. Full packet layout (`sleep_data_packet`, a `byte2`
+      field on `control_packet` not needed by lighting) ported from
+      gohv's own already-implemented sleep timer — no new capture
+      needed, confirming the prediction. Transaction shape differs from
+      lighting's: `START`/`SLEEP`-preamble/data, no `FINISH` packet.
 - [ ] **6d — Onboard profile switching (`Profiles`).** Needs a new
       capture — nothing about it has been decoded for our protocol yet,
       despite the `Profiles` capability trait already existing
       (Phase 3) and the driver already exposing it (Phase 4, still
-      stubbed).
+      stubbed). Unlike 6c, **none** of the three community references
+      have this decoded either — confirmed by checking all three:
+      gohv's source has zero profile-related code, TaxMachine's only
+      "profile" matches are false positives in vendored third-party
+      libraries (imgui, lodepng), and ak820pro-modder's own
+      `docs/PROTOCOL.md` lists it explicitly as "Onboard profile
+      switch — Not decoded, needs RE." No reference protocol to port
+      from anywhere; needs its own Wireshark capture session.
 - [ ] **6e — Per-key RGB.** New capture + decode required. High value,
       new `Capability` trait needed (see ak820pro-modder's
       `CustomLedMap`/`SET_CUSTOM_LED_DATA` for the *shape* of the

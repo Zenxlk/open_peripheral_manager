@@ -62,11 +62,19 @@ Same transport, same permissions caveats as "Using RGB control" above
 `pmctl lighting set --mode static` — both go through the same
 `Static`→`Breath(speed=0)` substitution documented in `findings.md`.
 
-**Only `static`/`breath` (via solid-color RGB) are confirmed against
-real hardware as of this writing** — see `findings.md`'s 2026-07-21
-entry. The other 18 modes are wired up and unit-tested against a fake
-transport but not yet run against the physical keyboard; some may need
-their own quirks/substitutions discovered the same way `static` did.
+Validated against real hardware across a representative sample of
+modes — see `findings.md`'s 2026-07-21 entries.
+
+## Using the sleep timer
+
+```
+pmctl sleep presets       # list every preset name
+pmctl sleep set 5m
+```
+
+Same transport/permissions as above. Ported from gohv's own already-
+decoded sleep timer (no new capture needed — see `findings.md`'s
+2026-07-21 6c entry) and validated against real hardware.
 
 ## Layout
 

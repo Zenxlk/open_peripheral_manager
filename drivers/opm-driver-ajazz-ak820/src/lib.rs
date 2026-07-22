@@ -10,7 +10,8 @@
 //! end-to-end against the real device.
 
 use opm_core::capability::{
-    Direction, Lighting, LightingEffect, LightingMode, Profiles, Rgb, RgbColor,
+    Direction, Lighting, LightingEffect, LightingMode, Profiles, Rgb, RgbColor, SleepTime,
+    SleepTimer,
 };
 use opm_core::device::Device;
 use opm_core::driver::Driver;
@@ -19,9 +20,8 @@ use opm_core::identity::{Identity, Interface, UsagePair};
 use opm_core::transport::Transport;
 
 /// The AK820's wire-level packet layout — public so other code (a
-/// future GUI, another capability implementation) can build on the
-/// sleep-timer catalog this crate carries even though it isn't wired
-/// into a `Capability` yet. See the module's own docs for credits.
+/// future GUI, another capability implementation) can build on it. See
+/// the module's own docs for credits.
 pub mod protocol;
 use protocol::{CONTROL_REPORT_ID, control_packet, mode_data_packet};
 
@@ -127,6 +127,10 @@ impl Device for AjazzAk820Device {
     fn lighting(&self) -> Option<&dyn Lighting> {
         Some(self)
     }
+
+    fn sleep_timer(&self) -> Option<&dyn SleepTimer> {
+        Some(self)
+    }
 }
 
 /// A single message shared by every capability stub below: the real
@@ -210,8 +214,14 @@ impl Lighting for AjazzAk820Device {
             (effect.mode, effect.speed)
         };
 
-        send(&*self.vendor, control_packet(protocol::CMD_START, 0x01))?;
-        send(&*self.vendor, control_packet(protocol::CMD_MODE, 0x01))?;
+        send(
+            &*self.vendor,
+            control_packet(protocol::CMD_START, 0x00, 0x01),
+        )?;
+        send(
+            &*self.vendor,
+            control_packet(protocol::CMD_MODE, 0x00, 0x01),
+        )?;
         send(
             &*self.vendor,
             mode_data_packet(
@@ -225,7 +235,31 @@ impl Lighting for AjazzAk820Device {
                 effect.direction,
             ),
         )?;
-        send(&*self.vendor, control_packet(protocol::CMD_FINISH, 0x01))?;
+        send(
+            &*self.vendor,
+            control_packet(protocol::CMD_FINISH, 0x00, 0x01),
+        )?;
+        std::thread::sleep(POST_TRANSACTION_DELAY);
+        Ok(())
+    }
+}
+
+impl SleepTimer for AjazzAk820Device {
+    fn set_sleep_time(&self, time: SleepTime) -> Result<(), Error> {
+        // No FINISH packet here, unlike set_effect's transaction —
+        // gohv/EPOMAKER-Ajazz-AK820-Pro's own set_sleep_time doesn't
+        // send one either. Byte 2 of the SLEEP preamble is 0x01 (vs.
+        // 0x00 for START/MODE/FINISH); meaning not understood, ported
+        // as-is — see protocol.rs's control_packet docs.
+        send(
+            &*self.vendor,
+            control_packet(protocol::CMD_START, 0x00, 0x01),
+        )?;
+        send(
+            &*self.vendor,
+            control_packet(protocol::CMD_SLEEP, 0x01, 0x01),
+        )?;
+        send(&*self.vendor, protocol::sleep_data_packet(time))?;
         std::thread::sleep(POST_TRANSACTION_DELAY);
         Ok(())
     }
@@ -419,8 +453,8 @@ mod tests {
             .expect("set_color should succeed against a fake transport");
 
         let expected_packets = [
-            control_packet(protocol::CMD_START, 0x01),
-            control_packet(protocol::CMD_MODE, 0x01),
+            control_packet(protocol::CMD_START, 0x00, 0x01),
+            control_packet(protocol::CMD_MODE, 0x00, 0x01),
             mode_data_packet(
                 LightingMode::Breath,
                 color.r,
@@ -431,7 +465,7 @@ mod tests {
                 0,
                 Direction::Left,
             ),
-            control_packet(protocol::CMD_FINISH, 0x01),
+            control_packet(protocol::CMD_FINISH, 0x00, 0x01),
         ];
 
         let calls = set_feature_calls.lock().unwrap();
@@ -502,5 +536,41 @@ mod tests {
         assert_eq!(data_packet.0, LightingMode::Spectrum as u8);
         assert_eq!(data_packet.1[9], 4); // speed, unmodified (pkt[10], shifted by the report-id byte)
         assert_eq!(data_packet.1[10], Direction::Right as u8); // pkt[11]
+    }
+
+    #[test]
+    fn set_sleep_time_sends_start_sleep_data_with_no_finish() {
+        let transport = FakeTransport::default();
+        let set_feature_calls = transport.set_feature_calls.clone();
+        let get_feature_report_ids = transport.get_feature_report_ids.clone();
+        let device = AjazzAk820Device {
+            identity: real_ak820_identity(),
+            vendor: Box::new(transport),
+        };
+
+        device
+            .set_sleep_time(SleepTime::FiveMinutes)
+            .expect("set_sleep_time should succeed against a fake transport");
+
+        let expected_packets = [
+            control_packet(protocol::CMD_START, 0x00, 0x01),
+            control_packet(protocol::CMD_SLEEP, 0x01, 0x01),
+            protocol::sleep_data_packet(SleepTime::FiveMinutes),
+        ];
+
+        let calls = set_feature_calls.lock().unwrap();
+        assert_eq!(calls.len(), expected_packets.len());
+        for (call, packet) in calls.iter().zip(expected_packets.iter()) {
+            assert_eq!(call.0, packet[0]);
+            assert_eq!(call.1.as_slice(), &packet[1..]);
+        }
+
+        // Only the two CONTROL_REPORT_ID packets (START/SLEEP preamble)
+        // get a GET_REPORT handshake — the sleep-data packet's report ID
+        // is 0, same category as a lighting mode-data packet.
+        assert_eq!(
+            get_feature_report_ids.lock().unwrap().as_slice(),
+            &[CONTROL_REPORT_ID, CONTROL_REPORT_ID]
+        );
     }
 }

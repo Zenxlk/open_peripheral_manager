@@ -35,6 +35,8 @@ enum Command {
     /// Apply an animated lighting effect (mode, brightness, speed,
     /// direction), beyond a single solid color.
     Lighting(commands::lighting::Args),
+    /// Set the idle lighting-sleep timer.
+    Sleep(commands::sleep::Args),
 }
 
 fn main() {
@@ -47,5 +49,6 @@ fn main() {
         Command::Rgb(args) => commands::rgb::run(args),
         Command::Profile(args) => commands::profile::run(args),
         Command::Lighting(args) => commands::lighting::run(args),
+        Command::Sleep(args) => commands::sleep::run(args),
     }
 }

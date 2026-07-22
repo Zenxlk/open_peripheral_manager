@@ -9,3 +9,4 @@ pub mod list;
 pub mod profile;
 mod registry;
 pub mod rgb;
+pub mod sleep;
