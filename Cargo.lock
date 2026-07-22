@@ -202,7 +202,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "opm-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "opm-core",
@@ -214,7 +214,7 @@ dependencies = [
 
 [[package]]
 name = "opm-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "thiserror",
@@ -222,7 +222,7 @@ dependencies = [
 
 [[package]]
 name = "opm-discovery"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hidapi",
  "hidreport",
@@ -232,7 +232,7 @@ dependencies = [
 
 [[package]]
 name = "opm-driver-ajazz-ak820"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "opm-core",
  "opm-transport",
@@ -240,7 +240,7 @@ dependencies = [
 
 [[package]]
 name = "opm-transport"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hidapi",
  "opm-core",

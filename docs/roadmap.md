@@ -149,13 +149,14 @@ byte of the AK820's real protocol is known.
 
 ## Phase 6 — Protocol reverse-engineering
 
-**Status: solid-color RGB done and validated against real hardware.**
-`pmctl rgb set` genuinely changes the AK820 Pro's lighting (tested with
-four different colors, two runs back-to-back with no manual
-intervention). Profiles, brightness-only changes, and reading color
-back are still open. Figure out the AK820's actual vendor protocol
-(RGB, profiles, whatever else it turns out to expose), turning Phase
-4's stub `Capability` implementations into real ones. Lives under
+**Status: solid-color RGB, full lighting-mode/animation control (6a),
+and the sleep timer (6c) done and validated against real hardware.**
+`pmctl rgb set`/`pmctl lighting set`/`pmctl sleep set` all genuinely
+change the AK820 Pro. `get_color` (6b), profiles (6d), per-key RGB
+(6e), keymap (6f), macros (6g), and TFT (6h) are still open — see the
+sub-phase breakdown below. Figure out the AK820's actual vendor
+protocol, turning Phase 4's stub `Capability` implementations into
+real ones. Lives under
 [`protocols/ajazz-ak820/`](protocols/ajazz-ak820/); the driver-internal
 `Protocol` concept from `architecture/domain-model.md`.
 
