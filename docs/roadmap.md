@@ -278,10 +278,14 @@ branch + PR.
       capture — nothing about it has been decoded for our protocol yet,
       despite the `Profiles` capability trait already existing
       (Phase 3) and the driver already exposing it (Phase 4, still
-      stubbed). Unlike 6c, gohv doesn't implement this either (confirmed
-      by inspecting its source — no profile-related code at all), so
-      there's no reference protocol to port; needs its own Wireshark
-      capture session.
+      stubbed). Unlike 6c, **none** of the three community references
+      have this decoded either — confirmed by checking all three:
+      gohv's source has zero profile-related code, TaxMachine's only
+      "profile" matches are false positives in vendored third-party
+      libraries (imgui, lodepng), and ak820pro-modder's own
+      `docs/PROTOCOL.md` lists it explicitly as "Onboard profile
+      switch — Not decoded, needs RE." No reference protocol to port
+      from anywhere; needs its own Wireshark capture session.
 - [ ] **6e — Per-key RGB.** New capture + decode required. High value,
       new `Capability` trait needed (see ak820pro-modder's
       `CustomLedMap`/`SET_CUSTOM_LED_DATA` for the *shape* of the
