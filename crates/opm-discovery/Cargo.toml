@@ -24,4 +24,4 @@ hidapi = { version = "2", default-features = false, features = [
 # information belongs to the HID descriptor?" — a purpose-built parser
 # rather than a hand-rolled one.
 hidreport = "0.5"
-thiserror = "1"
+thiserror = "2"
