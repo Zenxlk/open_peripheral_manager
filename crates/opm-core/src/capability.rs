@@ -8,10 +8,12 @@
 //! Every method returns a `Result` — talking to real hardware can always
 //! fail, so none of these can honestly be infallible.
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::Error;
 
 /// An RGB color, 8 bits per channel.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RgbColor {
     /// Red channel.
     pub r: u8,
@@ -76,7 +78,7 @@ pub trait SleepTimer: Send {
 }
 
 /// How long a device waits, idle, before its lighting sleeps.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum SleepTime {
     /// Never sleep.
@@ -121,7 +123,7 @@ impl SleepTime {
 /// its brightness/speed/direction. `brightness`/`speed` are raw,
 /// device-specific ranges (0-5 on the AK820 today) — see ADR 0005 for
 /// why these aren't normalized to a percentage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LightingEffect {
     /// Which animation (or `Static`/`Off`) to run.
     pub mode: LightingMode,
@@ -140,7 +142,7 @@ pub struct LightingEffect {
 /// Every lighting effect mode the AK820 exposes. Numeric values are the
 /// wire opcode on that device (`repr(u8)`, matched 1:1 in
 /// `drivers/opm-driver-ajazz-ak820/src/protocol.rs`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum LightingMode {
     /// Lighting off entirely.
@@ -257,7 +259,7 @@ impl LightingMode {
 
 /// The direction an animated [`LightingMode`] runs in, for the modes
 /// that support one (see [`LightingMode::supported_directions`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Direction {
     /// Leftward.

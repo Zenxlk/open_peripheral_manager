@@ -19,3 +19,8 @@ workspace = true
 # library.
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"
+
+[dev-dependencies]
+# Only for preset.rs's round-trip test — opm-core doesn't otherwise
+# care how a Preset is stored, see ADR 0006.
+serde_json = "1"
