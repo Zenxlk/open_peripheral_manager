@@ -1,0 +1,14 @@
+{
+  "lighting": {
+    "mode": "Spectrum",
+    "color": {
+      "r": 255,
+      "g": 255,
+      "b": 255
+    },
+    "brightness": 5,
+    "speed": 5,
+    "direction": "Left"
+  },
+  "sleep_time": "Never"
+}
