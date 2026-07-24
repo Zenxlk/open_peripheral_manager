@@ -1,0 +1,53 @@
+# Maintainer: Zenxlk
+#
+# NOTE: pkgver/sha256sums must point at a release that actually
+# contains docs/protocols/ajazz-ak820/70-ak820-hidraw.rules and the
+# GROUP="opm" version of 99-ak820-usb.rules (ADR 0007) — v0.2.0
+# predates both. Update both together whenever RELEASING.md's process
+# cuts a new tag; see this repo's RELEASING.md "Arch packaging" section.
+pkgname=pmctl
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Open Peripheral Manager — CLI for controlling supported HID peripherals (Ajazz AK820 lighting, sleep timer, host-side presets)"
+arch=('x86_64')
+url="https://github.com/Zenxlk/open_peripheral_manager"
+license=('MIT' 'Apache-2.0')
+depends=('libusb' 'systemd-libs')
+makedepends=('cargo')
+provides=('pmctl')
+conflicts=('pmctl')
+# Arch's default build options inject -flto=auto into CFLAGS/LDFLAGS.
+# hidapi's linux-static-hidraw feature compiles a small vendored C
+# shim (via the `cc` crate) that picks CFLAGS up automatically; the
+# resulting LTO-bitcode static lib then fails to link against the
+# final (non-LTO) rustc invocation with "undefined symbol: hid_*"
+# errors — reproduced and confirmed locally, not a hypothetical.
+options=('!lto')
+install="$pkgname.install"
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Zenxlk/open_peripheral_manager/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('8fe6e1339a698830510b864c42583237326d08fbd646a8227760126c966af4d8')
+_srcdir="open_peripheral_manager-$pkgver"
+
+build() {
+  cd "$_srcdir"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo build --release --workspace --locked
+}
+
+check() {
+  cd "$_srcdir"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --release --workspace --locked
+}
+
+package() {
+  cd "$_srcdir"
+  install -Dm755 target/release/pmctl "$pkgdir/usr/bin/pmctl"
+  install -Dm644 docs/protocols/ajazz-ak820/70-ak820-hidraw.rules \
+    "$pkgdir/usr/lib/udev/rules.d/70-ak820-hidraw.rules"
+  install -Dm644 docs/protocols/ajazz-ak820/99-ak820-usb.rules \
+    "$pkgdir/usr/lib/udev/rules.d/99-ak820-usb.rules"
+  install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
+  install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
