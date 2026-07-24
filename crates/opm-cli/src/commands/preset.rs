@@ -63,6 +63,12 @@ enum Action {
     },
     /// Lists every saved preset name.
     List,
+    /// Deletes a saved preset. Only removes the local file — has no
+    /// effect on the device's current lighting/sleep-timer state.
+    Delete {
+        /// The preset's name.
+        name: String,
+    },
 }
 
 /// Runs the `preset` subcommand.
@@ -71,6 +77,7 @@ pub fn run(args: Args) {
         Action::Save { .. } => run_save(args),
         Action::List => run_list(),
         Action::Apply { .. } => run_apply(args),
+        Action::Delete { .. } => run_delete(args),
     }
 }
 
@@ -207,6 +214,23 @@ fn run_apply(args: Args) {
             std::process::exit(code);
         }
     }
+}
+
+fn run_delete(args: Args) {
+    let Action::Delete { name } = &args.action else {
+        unreachable!("run_delete is only called for Action::Delete");
+    };
+    let path = preset_path(name);
+    if let Err(err) = fs::remove_file(&path) {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            eprintln!("no preset named {name:?} ({})", path.display());
+        } else {
+            eprintln!("failed to delete {}: {err}", path.display());
+        }
+        std::process::exit(device::EXIT_USAGE);
+    }
+    println!("deleted preset {name:?}");
+    std::process::exit(device::EXIT_OK);
 }
 
 fn build_effect(

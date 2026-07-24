@@ -83,6 +83,7 @@ pmctl preset save gaming --mode spectrum --speed 5 --sleep never
 pmctl preset save chill --mode breath --color 7c5cff --brightness 2
 pmctl preset list
 pmctl preset apply gaming
+pmctl preset delete chill
 ```
 
 **This is not the keyboard's onboard profile switching** — that's
