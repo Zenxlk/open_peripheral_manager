@@ -1,6 +1,6 @@
 # Maintainer: Zenxlk
 pkgname=pmctl
-pkgver=0.3.0
+pkgver=0.3.1
 pkgrel=1
 pkgdesc="Open Peripheral Manager — CLI for controlling supported HID peripherals (Ajazz AK820 lighting, sleep timer, host-side presets)"
 arch=('x86_64')
@@ -19,7 +19,7 @@ conflicts=('pmctl')
 options=('!lto')
 install="$pkgname.install"
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Zenxlk/open_peripheral_manager/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('11f53cc17d80a7c004a60f75079169c987fdecd609e4db0fd3ea291faae6298c')
+sha256sums=('7fd8ccf8351945d1c129ab445b2c3d47cdc87df5312e07b8209db753c03a96fc')
 _srcdir="open_peripheral_manager-$pkgver"
 
 build() {
