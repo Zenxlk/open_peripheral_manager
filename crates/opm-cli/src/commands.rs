@@ -6,6 +6,7 @@ pub mod discover;
 pub mod info;
 pub mod lighting;
 pub mod list;
+pub mod preset;
 pub mod profile;
 mod registry;
 pub mod rgb;

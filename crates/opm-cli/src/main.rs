@@ -37,6 +37,9 @@ enum Command {
     Lighting(commands::lighting::Args),
     /// Set the idle lighting-sleep timer.
     Sleep(commands::sleep::Args),
+    /// Save/apply a host-side preset (lighting effect and/or sleep
+    /// timer) — not onboard device storage, see ADR 0006.
+    Preset(commands::preset::Args),
 }
 
 fn main() {
@@ -50,5 +53,6 @@ fn main() {
         Command::Profile(args) => commands::profile::run(args),
         Command::Lighting(args) => commands::lighting::run(args),
         Command::Sleep(args) => commands::sleep::run(args),
+        Command::Preset(args) => commands::preset::run(args),
     }
 }
