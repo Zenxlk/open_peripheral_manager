@@ -625,3 +625,13 @@ sessions:**
   untested; would need one more isolated, clean capture.
 - The `04 f5`/`09` pair and the footer-byte-order discrepancy are both
   unexplained, noted for whoever picks up lighting/profile work next.
+
+**Update 2026-07-23, later the same day — `pmctl preset apply`
+validated against real hardware.** Saved `gaming.json` (Spectrum,
+speed 5, sleep never) via `pmctl preset save`, then `sudo pmctl preset
+apply gaming` — the keyboard's lighting genuinely changed. Confirms
+`Preset::apply`'s dispatch to `Lighting::set_effect`/
+`SleepTimer::set_sleep_time` works end-to-end, as expected since both
+capabilities were already independently validated (2026-07-21 entries)
+— this only exercises the new file-read/dispatch layer, not new wire
+protocol.

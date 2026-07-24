@@ -95,9 +95,10 @@ and/or sleep-timer setting and re-applies it by calling `pmctl
 lighting`/`pmctl sleep` under the hood. It does **not** persist on the
 keyboard itself — plug it into a machine without this project
 installed and the preset has no effect. `pmctl preset apply` needs the
-same device permissions as `rgb`/`lighting`/`sleep`. **Not yet run
-against real hardware** — `save`/`list` and the error paths are
-tested; `apply` only unit-tested against a fake device so far.
+same device permissions as `rgb`/`lighting`/`sleep`. Validated against
+real hardware — `pmctl preset apply gaming` (with `sudo`, same
+permissions caveat as every other write command) genuinely changed the
+keyboard's lighting.
 
 [`examples/presets/`](../../../examples/presets/) has three ready-made
 presets (`gaming.json`, `focus.json`, `off.json`) in the exact format

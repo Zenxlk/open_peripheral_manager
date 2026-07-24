@@ -156,9 +156,10 @@ change the AK820 Pro. `get_color` (6b), per-key RGB (6e), keymap (6f),
 macros (6g), and TFT (6h) are still open — see the sub-phase breakdown
 below. **6d (onboard profiles) is parked**, its motivating need served
 instead by a new, cross-cutting, non-AK820-specific feature: host-side
-presets (`pmctl preset save/apply/list`,
+presets (`pmctl preset save/apply/list/delete`,
 [ADR 0006](architecture/decisions/0006-host-side-presets-not-onboard-profiles.md)) —
-implemented, not yet run against real hardware. Figure out the AK820's
+implemented and validated against real hardware (`pmctl preset apply`
+genuinely changed the keyboard's lighting). Figure out the AK820's
 actual vendor protocol, turning Phase 4's stub `Capability`
 implementations into real ones. Lives under
 [`protocols/ajazz-ak820/`](protocols/ajazz-ak820/); the driver-internal
