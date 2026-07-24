@@ -152,11 +152,15 @@ byte of the AK820's real protocol is known.
 **Status: solid-color RGB, full lighting-mode/animation control (6a),
 and the sleep timer (6c) done and validated against real hardware.**
 `pmctl rgb set`/`pmctl lighting set`/`pmctl sleep set` all genuinely
-change the AK820 Pro. `get_color` (6b), profiles (6d), per-key RGB
-(6e), keymap (6f), macros (6g), and TFT (6h) are still open — see the
-sub-phase breakdown below. Figure out the AK820's actual vendor
-protocol, turning Phase 4's stub `Capability` implementations into
-real ones. Lives under
+change the AK820 Pro. `get_color` (6b), per-key RGB (6e), keymap (6f),
+macros (6g), and TFT (6h) are still open — see the sub-phase breakdown
+below. **6d (onboard profiles) is parked**, its motivating need served
+instead by a new, cross-cutting, non-AK820-specific feature: host-side
+presets (`pmctl preset save/apply/list`,
+[ADR 0006](architecture/decisions/0006-host-side-presets-not-onboard-profiles.md)) —
+implemented, not yet run against real hardware. Figure out the AK820's
+actual vendor protocol, turning Phase 4's stub `Capability`
+implementations into real ones. Lives under
 [`protocols/ajazz-ak820/`](protocols/ajazz-ak820/); the driver-internal
 `Protocol` concept from `architecture/domain-model.md`.
 
@@ -274,18 +278,22 @@ branch + PR.
       gohv's own already-implemented sleep timer — no new capture
       needed, confirming the prediction. Transaction shape differs from
       lighting's: `START`/`SLEEP`-preamble/data, no `FINISH` packet.
-- [ ] **6d — Onboard profile switching (`Profiles`).** Needs a new
-      capture — nothing about it has been decoded for our protocol yet,
-      despite the `Profiles` capability trait already existing
-      (Phase 3) and the driver already exposing it (Phase 4, still
-      stubbed). Unlike 6c, **none** of the three community references
-      have this decoded either — confirmed by checking all three:
-      gohv's source has zero profile-related code, TaxMachine's only
-      "profile" matches are false positives in vendored third-party
-      libraries (imgui, lodepng), and ak820pro-modder's own
-      `docs/PROTOCOL.md` lists it explicitly as "Onboard profile
-      switch — Not decoded, needs RE." No reference protocol to port
-      from anywhere; needs its own Wireshark capture session.
+- [ ] **6d — Onboard profile switching (`Profiles`). Parked, not
+      abandoned.** Two real captures taken (see
+      `protocols/ajazz-ak820/findings.md`'s 2026-07-23 entry) — the
+      result is ambiguous, not decoded: every observed switch emits the
+      exact same two-command sequence regardless of source/target
+      profile, out of three configured. Either a fixed handshake
+      unrelated to the specific profile, or an encoding not found yet;
+      resolving it needs more captures (including the untested third
+      profile) that haven't been prioritized since. Meanwhile, **Phase
+      6d's motivating need — "let `pmctl` remember and reapply a named
+      configuration" — is now served differently**: host-side,
+      file-backed presets (`pmctl preset`, see
+      [ADR 0006](architecture/decisions/0006-host-side-presets-not-onboard-profiles.md)),
+      which don't need the onboard protocol solved at all. Real onboard
+      profile switching (persists without this software installed, on
+      a different host) stays open for whenever it's worth resuming.
 - [ ] **6e — Per-key RGB.** New capture + decode required. High value,
       new `Capability` trait needed (see ak820pro-modder's
       `CustomLedMap`/`SET_CUSTOM_LED_DATA` for the *shape* of the

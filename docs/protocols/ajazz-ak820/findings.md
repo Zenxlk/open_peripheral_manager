@@ -516,3 +516,112 @@ AK820 — confirmed working. Phase 6c counts as done.
 - `byte2`'s meaning across command families (`0x00` vs `0x01` vs
   ak820pro-modder's own unrelated `addr`/`len` fields on a completely
   different protocol) is still not understood, just empirically ported.
+
+## 2026-07-23 — Phase 6d: onboard profile switching captured but not decoded; pivoted to host-side presets instead
+
+Two real captures against the vendor software's profile UI (3 profiles
+configured, switched by clicking in the software — confirmed with the
+maintainer, not a physical key combo): `captures/quintoTraseo(filtro4).pcapng`
+(one click, profile 1 → 2) and `captures/sextoTraseo(filtro4).pcapng`
+(several clicks toggling 1 ↔ 2, plus a lighting mode assignment and
+what turned out to be clock-sync traffic — see below). Same filter as
+every prior session (`usb.transfer_type == 0x02 && usb.bmRequestType
+== 0x21 && usbhid.setup.bRequest == 0x09`, plus the `0xa1`/`0x01`
+GET_REPORT responses this time to check for an echo).
+
+**Every profile-switch transaction has the same shape** (`tshark`
+field extraction, not manual Wireshark browsing this time — `-Y
+"usb.transfer_type == 0x02 && usbhid.setup.bRequest == 0x09 &&
+usb.bmRequestType == 0x21" -T fields -e usb.data_fragment` against the
+raw `.pcapng`):
+
+```
+04 18 00...                            START (same as lighting/sleep)
+04 <X> 00 00 00 00 00 00 00 09 00...   "preamble" — byte1 varies, byte9 always 0x09
+[8-9 packets, 64 bytes each, all zero]
+00...(zeros)...aa 55                   "data" packet — empty except the aa55 footer at bytes 62-63
+04 02 00...                            generic commit/SAVE (matches gohv's CMD_SAVE = 0x02)
+04 f0 00...                             FINISH
+```
+
+**Only two `byte1` values ever appeared, always alternating: `0x11`
+then `0x27`, never repeated back-to-back, never any other value** —
+across 6 total profile-switch transactions in the two captures
+combined (2 in quintoTraseo, 4 in sextoTraseo), despite the maintainer
+having 3 profiles configured. The `04 f0`/`04 02` GET_REPORT responses
+are pure handshake echoes (`04 <cmd> 00 01 [...]`) — no additional
+information there either.
+
+**This is ambiguous, not decoded.** Two explanations remain open:
+1. `0x11` = "activate profile 1", `0x27` = "activate profile 2", and
+   the maintainer's clicks in both sessions happened to only ever
+   involve those two profiles (quintoTraseo's single "cambié de
+   perfil" click producing *two* transactions doesn't fit this
+   cleanly, though — see below).
+2. Every switch, regardless of source/destination, emits the exact
+   same fixed two-command handshake — i.e. these bytes don't encode
+   the profile at all, and the real encoding (if any exists in this
+   command family) is somewhere not yet found, possibly not even in
+   this filtered packet set.
+
+quintoTraseo is the stronger data point against explanation 1: **one
+described click (1 → 2) produced two full transactions** (`0x11` then
+`0x27`), not one — if `byte1` directly named the destination profile,
+a single switch should only need to send the destination's value once.
+Resolving this needs a capture explicitly involving the untested third
+profile (requested from the maintainer but not obtained before this
+entry was written) to see whether a third distinct `byte1` value shows
+up at all.
+
+**Decision: park Phase 6d, pivot to a host-side alternative.** Given
+the ambiguity and diminishing returns on further guessing, the
+maintainer proposed remembering lighting/sleep-timer settings in a
+local file instead of solving the onboard-profile protocol. Implemented
+as `pmctl preset save/apply/list` — see
+[ADR 0006](../../architecture/decisions/0006-host-side-presets-not-onboard-profiles.md)
+for the full reasoning, in particular why this is **not** the same
+thing as onboard profiles (doesn't persist to a different host) and
+doesn't reuse the existing `Profiles` capability trait. Phase 6d itself
+stays open in `roadmap.md`, parked rather than closed.
+
+**Bonus findings, not part of Phase 6d but captured in the same
+sessions:**
+
+- **Clock sync decoded, unprompted.** sextoTraseo has two `START` →
+  `04 28 00... 01...` → data → `SAVE` transactions (no `FINISH`,
+  same shape as sleep's transaction). `0x28` matches gohv's
+  `CMD_TIME` constant exactly. The data packet decodes cleanly against
+  gohv's `time_data_packet` layout (`pkt[4]`=month, `pkt[5]`=day,
+  `pkt[6]`=hour, `pkt[7]`=minute, `pkt[8]`=second, `pkt[10]`=`0x04`
+  fixed): both captured instances decode to July 23, ~20:xx, one
+  second apart — the actual capture date and time. This looks fully
+  portable from gohv with no new discovery needed, same as 6c's sleep
+  timer — a good candidate for a future, low-effort sub-phase if the
+  keyboard's TFT clock display ever becomes a priority.
+- **The official software's own lighting packets don't match our
+  ported `mode_data_packet` layout.** Two real `SET_LED_EFFECT`-family
+  packets appeared (`01 db 95 fe 00×5 05 03 00×3 aa 55` — Static; `07
+  ff 00×6 01 05 03 00×3 aa 55` — Breath/red). Both put the `05 03`
+  "mystery bytes" (first seen in the very first solid-color capture)
+  at bytes 9-10 and the footer at bytes 14-15 as `AA 55` — **the
+  opposite byte order from this project's own `protocol::mode_data_packet`**,
+  which writes `pkt[14] = 0x55; pkt[15] = 0xaa` (from gohv). Since
+  `pmctl lighting set` is already validated working against real
+  hardware with the swapped order, the firmware evidently doesn't
+  strictly validate this footer — left unexplained and not acted on,
+  same category as the `05 03` bytes themselves.
+- **An unexplained `04 f5 ... 09` pair.** Twice in sextoTraseo, right
+  after a lighting-mode transaction's `FINISH` and before the next
+  `START`, a packet `04 f5 00 00 00 00 00 00 00 09 00...` appears
+  (byte9 = `0x09`, the same marker seen in the profile preambles),
+  each immediately followed by a `SAVE` (`0x02`) — but with no
+  `START`/`FINISH` wrapping the pair itself. Not investigated further;
+  possibly an unrelated periodic sync unrelated to any specific
+  command family.
+
+**Known gaps, carried forward:**
+- Phase 6d's actual protocol is still unknown — parked, see above.
+- Whether a third `byte1` value exists for the third profile is
+  untested; would need one more isolated, clean capture.
+- The `04 f5`/`09` pair and the footer-byte-order discrepancy are both
+  unexplained, noted for whoever picks up lighting/profile work next.

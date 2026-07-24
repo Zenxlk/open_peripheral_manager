@@ -76,6 +76,28 @@ Same transport/permissions as above. Ported from gohv's own already-
 decoded sleep timer (no new capture needed — see `findings.md`'s
 2026-07-21 6c entry) and validated against real hardware.
 
+## Using presets (host-side, not onboard profiles)
+
+```
+pmctl preset save gaming --mode spectrum --speed 5 --sleep never
+pmctl preset save chill --mode breath --color 7c5cff --brightness 2
+pmctl preset list
+pmctl preset apply gaming
+```
+
+**This is not the keyboard's onboard profile switching** — that's
+still unresolved (Phase 6d, parked — see `findings.md`'s 2026-07-23
+entry and [ADR 0006](../../architecture/decisions/0006-host-side-presets-not-onboard-profiles.md)).
+A preset is a JSON file under `$XDG_CONFIG_HOME/opm/presets/` (falls
+back to `~/.config/opm/presets/`) that remembers a lighting effect
+and/or sleep-timer setting and re-applies it by calling `pmctl
+lighting`/`pmctl sleep` under the hood. It does **not** persist on the
+keyboard itself — plug it into a machine without this project
+installed and the preset has no effect. `pmctl preset apply` needs the
+same device permissions as `rgb`/`lighting`/`sleep`. **Not yet run
+against real hardware** — `save`/`list` and the error paths are
+tested; `apply` only unit-tested against a fake device so far.
+
 ## Layout
 
 - `captures/` — raw USB/HID captures (`usbmon`, Wireshark/`usbpcap`
