@@ -138,6 +138,17 @@ fn run_save(args: Args) {
             std::process::exit(device::EXIT_FAILED);
         }
     }
+    // fs::write follows symlinks — if something with write access to
+    // the presets directory (a different process running as this same
+    // user, say) planted `<name>.json` as a symlink elsewhere, a
+    // routine `save` would silently overwrite whatever it points to.
+    // Confirmed by direct testing. Refuse rather than follow.
+    if let Ok(metadata) = fs::symlink_metadata(&path) {
+        if metadata.file_type().is_symlink() {
+            eprintln!("refusing to write through a symlink at {}", path.display());
+            std::process::exit(device::EXIT_FAILED);
+        }
+    }
     let json =
         serde_json::to_string_pretty(&preset).expect("serializing a Preset should never fail");
     if let Err(err) = fs::write(&path, json) {
