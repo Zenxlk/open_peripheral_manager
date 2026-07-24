@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-23
+
+Host-side presets, and the long-standing `sudo` requirement fixed for
+real. No breaking API changes — `pmctl`'s subcommands and `opm-core`'s
+public traits are all additive.
+
+### Added
+
+- Host-side, file-backed presets: `pmctl preset save/apply/list/delete`
+  remembers a named `LightingEffect`/`SleepTime` combination in
+  `$XDG_CONFIG_HOME/opm/presets/` and re-applies it via the already-
+  real `Lighting`/`SleepTimer` capabilities. New `opm_core::preset::Preset`.
+  Explicitly **not** the AK820's onboard profile storage — see
+  [ADR 0006](docs/architecture/decisions/0006-host-side-presets-not-onboard-profiles.md).
+  Ships with three example presets under `examples/presets/`. Validated
+  against real hardware.
+  - Investigated the AK820's actual onboard profile-switching protocol
+    first (two real captures) — result was ambiguous, not decoded (the
+    same two commands always fire regardless of source/target profile
+    across three configured profiles). Phase 6d is parked, not
+    abandoned, in favor of this host-side alternative.
+- **Fixed the `sudo` requirement** every hardware-touching `pmctl`
+  command has needed since Phase 6: root-caused to `systemd-logind`
+  never granting a `uaccess` ACL for a raw USB device node the kernel
+  also recognizes as an input device, confirmed via direct comparison
+  against real hardware (`udevadm`/`getfacl`/`loginctl`), not guessed.
+  `99-ak820-usb.rules` now uses a dedicated `opm` group instead — see
+  [ADR 0007](docs/architecture/decisions/0007-udev-group-not-uaccess-for-libusbtransport-devices.md).
+  Users join the group once (`sudo usermod -aG opm $USER`, log out/in);
+  every hardware command works with no `sudo` after that. The Phase 2
+  hidraw rule (`70-ak820-hidraw.rules`, unaffected by this bug) is now
+  checked into the repo for the first time.
+- Arch Linux packaging: `packaging/arch/PKGBUILD`, tested end-to-end
+  with real `makepkg` builds. Installs both udev rules to
+  `/usr/lib/udev/rules.d/` and creates the `opm` group automatically on
+  install — `usermod -aG opm` stays a one-time manual step. Not yet
+  submitted to the AUR.
+
 ## [0.2.0] - 2026-07-21
 
 Phase 6a/6c: the AK820's full lighting-mode vocabulary and its sleep
