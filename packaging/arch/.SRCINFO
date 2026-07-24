@@ -1,0 +1,19 @@
+pkgbase = pmctl
+	pkgdesc = Open Peripheral Manager — CLI for controlling supported HID peripherals (Ajazz AK820 lighting, sleep timer, host-side presets)
+	pkgver = 0.2.0
+	pkgrel = 1
+	url = https://github.com/Zenxlk/open_peripheral_manager
+	install = pmctl.install
+	arch = x86_64
+	license = MIT
+	license = Apache-2.0
+	makedepends = cargo
+	depends = libusb
+	depends = systemd-libs
+	provides = pmctl
+	conflicts = pmctl
+	options = !lto
+	source = pmctl-0.2.0.tar.gz::https://github.com/Zenxlk/open_peripheral_manager/archive/refs/tags/v0.2.0.tar.gz
+	sha256sums = 8fe6e1339a698830510b864c42583237326d08fbd646a8227760126c966af4d8
+
+pkgname = pmctl

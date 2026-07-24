@@ -1,0 +1,23 @@
+post_install() {
+	getent group opm >/dev/null || groupadd -r opm
+	udevadm control --reload-rules >/dev/null 2>&1 || true
+	udevadm trigger --subsystem-match=usb --subsystem-match=hidraw >/dev/null 2>&1 || true
+	echo ""
+	echo "==> pmctl: AK820 hardware commands (rgb/lighting/sleep/preset apply)"
+	echo "==> need udev permissions that only apply to members of the new"
+	echo "==> 'opm' group. Run this once, then log out and back in:"
+	echo "==>"
+	echo "==>   sudo usermod -aG opm \"\$USER\""
+	echo "==>"
+	echo "==> Until then, those commands still work with sudo."
+}
+
+post_upgrade() {
+	udevadm control --reload-rules >/dev/null 2>&1 || true
+	udevadm trigger --subsystem-match=usb --subsystem-match=hidraw >/dev/null 2>&1 || true
+}
+
+post_remove() {
+	getent group opm >/dev/null 2>&1 && groupdel opm >/dev/null 2>&1 || true
+	udevadm control --reload-rules >/dev/null 2>&1 || true
+}
