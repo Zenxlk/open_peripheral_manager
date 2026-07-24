@@ -213,10 +213,15 @@ implementations into real ones. Lives under
       kernel driver — see `protocols/ajazz-ak820/findings.md`'s final
       2026-07-20 entry for the full story. `pmctl rgb set` confirmed
       working with four different real colors.
-- [ ] `pmctl rgb set`/`profile` still need `sudo` — the new `usb`-
-      subsystem udev rule (`protocols/ajazz-ak820/99-ak820-usb.rules`)
-      doesn't visibly grant access the way Phase 2's `hidraw` rule does;
-      not diagnosed further, see findings.md's known gaps.
+- [x] **`sudo` requirement resolved.** Root cause found and fixed —
+      `systemd-logind` won't ACL a raw USB device node the kernel also
+      recognizes as an input device, even when `uaccess` is tagged
+      (confirmed via `udevadm`/`getfacl`/`loginctl`, not guessed).
+      `99-ak820-usb.rules` now uses a dedicated `opm` group instead
+      (users join it once — see
+      [ADR 0007](architecture/decisions/0007-udev-group-not-uaccess-for-libusbtransport-devices.md)
+      and `protocols/ajazz-ak820/findings.md`'s 2026-07-23 entry).
+      Validated against real hardware: `pmctl rgb set` with no `sudo`.
 - [ ] `LibusbTransport::write_output`/`read_input` (interrupt-endpoint
       I/O) are implemented but never exercised against real hardware.
 

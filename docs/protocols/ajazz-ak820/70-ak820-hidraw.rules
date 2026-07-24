@@ -1,0 +1,19 @@
+# Grants non-root access to the AK820 Pro's hidraw nodes (used by
+# opm-transport's HidTransport for reads — see
+# docs/architecture/transport.md's Phase 2 design and Findings).
+#
+# Uses `uaccess` (systemd-logind's session ACL tag), not a group —
+# this one actually works, confirmed against real hardware (unlike the
+# usb-subsystem rule in 99-ak820-usb.rules, which needs a group
+# instead; see ADR 0007 for why the two rules use different
+# mechanisms).
+#
+# Install:
+#   sudo cp 70-ak820-hidraw.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger
+# Then unplug and replug the keyboard (or reboot). No group/logout
+# needed — `uaccess` applies to the current graphical session
+# automatically.
+
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="800a", TAG+="uaccess"
