@@ -1,0 +1,14 @@
+{
+  "lighting": {
+    "mode": "Breath",
+    "color": {
+      "r": 124,
+      "g": 92,
+      "b": 255
+    },
+    "brightness": 2,
+    "speed": 1,
+    "direction": "Left"
+  },
+  "sleep_time": "FiveMinutes"
+}

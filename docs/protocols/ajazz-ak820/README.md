@@ -98,6 +98,17 @@ same device permissions as `rgb`/`lighting`/`sleep`. **Not yet run
 against real hardware** — `save`/`list` and the error paths are
 tested; `apply` only unit-tested against a fake device so far.
 
+[`examples/presets/`](../../../examples/presets/) has three ready-made
+presets (`gaming.json`, `focus.json`, `off.json`) in the exact format
+`pmctl preset save` writes — copy one in directly instead of building
+it via flags:
+
+```
+mkdir -p ~/.config/opm/presets
+cp examples/presets/gaming.json ~/.config/opm/presets/
+pmctl preset apply gaming
+```
+
 ## Layout
 
 - `captures/` — raw USB/HID captures (`usbmon`, Wireshark/`usbpcap`

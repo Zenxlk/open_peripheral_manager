@@ -1,0 +1,14 @@
+{
+  "lighting": {
+    "mode": "Off",
+    "color": {
+      "r": 0,
+      "g": 0,
+      "b": 0
+    },
+    "brightness": 0,
+    "speed": 0,
+    "direction": "Left"
+  },
+  "sleep_time": "OneMinute"
+}
