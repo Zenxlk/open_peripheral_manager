@@ -22,15 +22,22 @@ itself — it's this one device's firmware being picky. A driver for a
 better-behaved device would just work over the normal `hidraw` path
 (`HidTransport`), no `sudo`, no udev rule beyond Phase 2's.
 
-**Permissions**, in the order to try them:
-1. Install [`99-ak820-usb.rules`](99-ak820-usb.rules) (`sudo cp` into
-   `/etc/udev/rules.d/`, `sudo udevadm control --reload-rules`,
-   `sudo udevadm trigger`, then unplug/replug the keyboard) — grants
-   non-root access to the raw USB device node. On the machine this was
-   developed on, the resulting `uaccess` ACL never actually appeared
-   (`getfacl` showed nothing), for reasons not diagnosed — the rule is
-   still correct and worth trying on a fresh system.
-2. If that doesn't work, run `pmctl rgb set`/`profile` with `sudo`.
+**Permissions**: install both udev rules, then join the `opm` group
+once (see [ADR 0007](../../architecture/decisions/0007-udev-group-not-uaccess-for-libusbtransport-devices.md)
+for why two different mechanisms are needed):
+
+```
+sudo groupadd -f opm
+sudo cp 70-ak820-hidraw.rules 99-ak820-usb.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+sudo usermod -aG opm "$USER"
+```
+
+Then **log out and back in** (group membership only applies to new
+sessions). After that, no `pmctl` command touching the AK820 needs
+`sudo` anymore — confirmed against real hardware. Until you've logged
+back in, `sudo` still works as a fallback.
 
 **If a run leaves the vendor interface broken** (symptom: `pmctl
 discover --verbose` shows only 3 AK820 interfaces instead of 4, or
@@ -119,7 +126,8 @@ pmctl preset apply gaming
   version control.
 - `findings.md` — running notes on what's been figured out: report
   descriptors, command byte layouts, known opcodes, open questions.
-- `99-ak820-usb.rules` — the udev rule from "Using RGB control" above.
+- `70-ak820-hidraw.rules`, `99-ak820-usb.rules` — the udev rules from
+  "Using RGB control" above.
 
 ## Capture workflow (Windows VM + Wireshark/USBPcap)
 

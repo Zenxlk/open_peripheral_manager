@@ -635,3 +635,63 @@ apply gaming` — the keyboard's lighting genuinely changed. Confirms
 capabilities were already independently validated (2026-07-21 entries)
 — this only exercises the new file-read/dispatch layer, not new wire
 protocol.
+
+## 2026-07-23 — Root cause found for the long-standing `sudo` requirement: `systemd-logind` won't ACL a raw USB input device, even when `uaccess` is tagged
+
+Carried as an unexplained known gap since the very first real-hardware
+`set_color` run (2026-07-20): every write-capable `pmctl` command needs
+`sudo`, despite `99-ak820-usb.rules` installing a `TAG+="uaccess"` rule
+for the raw USB device node `LibusbTransport` opens. Diagnosed for
+real this time, prompted by packaging coming up (an installer that
+auto-copies a rule that doesn't actually work just moves the same
+problem one step earlier).
+
+**Direct comparison against real hardware, device plugged in, on a
+confirmed-active `seat0` graphical session** (`loginctl show-session`:
+`Active=yes`, `State=active`; `loginctl seat-status seat0` shows the
+AK820's full `usb:3-2` device tree tracked on the seat — ruling out
+"no active session," the most common cause of `uaccess` not working):
+
+- `udevadm info --name=/dev/bus/usb/003/003` shows `TAGS=:seat:uaccess:`
+  — the rule's tag genuinely gets applied.
+- `getfacl /dev/bus/usb/003/003` shows only the default owner/group/
+  mask/other entries — **no `user:<name>:rw-` entry**. `uaccess` never
+  actually turned into an ACL here.
+- For comparison, `getfacl /dev/hidraw4` (the Phase 2 hidraw rule, also
+  `uaccess`-tagged, on the same device) **does** show a real
+  `user:ByZen:rw-` entry.
+
+The distinguishing factor: `/dev/bus/usb/003/003` is a
+`SUBSYSTEM=="usb"`, `DEVTYPE=="usb_device"` node that the kernel
+recognizes as an input device (`hid-generic`/`usbhid` bound to its
+interfaces at rest — `LibusbTransport` only detaches interface 3, and
+only transiently, for the duration of one command). `systemd-logind`
+deliberately declines to ACL raw USB device nodes already claimed by
+the kernel as input devices — a real security boundary (unscoped raw
+USB access to a keyboard is a much bigger foothold than a `hidraw`
+node), not a bug in this project's rule or a misconfigured system.
+
+**Verified empirically**: temporarily replacing the rule's
+`TAG+="uaccess"` with `MODE="0660", GROUP="wheel"` (maintainer already
+in `wheel`) produced an immediate, real `group: wheel` ACL entry —
+`GROUP=`/`MODE=` is udev's own unconditional mechanism, no
+`systemd-logind`/session involvement at all — and `pmctl rgb set`
+worked for real with **no `sudo`**.
+
+**Fix**: `99-ak820-usb.rules` now uses `MODE="0660", GROUP="opm"`
+instead of `uaccess` — see
+[ADR 0007](../../architecture/decisions/0007-udev-group-not-uaccess-for-libusbtransport-devices.md)
+for the full decision and why the hidraw rule (which does work with
+`uaccess`) is left unchanged. The hidraw rule itself is now also
+checked into the repo for the first time, as `70-ak820-hidraw.rules`
+(previously only ever existed locally, referenced but never shipped).
+
+**Known gaps, carried forward:**
+- Users must run `sudo usermod -aG opm "$USER"` once and log out/in —
+  not eliminated, just reduced from "every run" to "once." No way
+  found to make even that one step automatic from inside a package's
+  install script (no reliable way to know which desktop user should
+  join the group during a `pacman` transaction).
+- Whether this same `logind`-vs-input-device behavior affects other
+  Sonix/hid-generic-bound keyboards in the same way is assumed, not
+  independently verified against a second device.
