@@ -95,6 +95,11 @@ fn run_save(args: Args) {
         unreachable!("run_save is only called for Action::Save");
     };
 
+    if let Err(message) = validate_preset_name(&name) {
+        eprintln!("{message}");
+        std::process::exit(device::EXIT_USAGE);
+    }
+
     let lighting = match mode {
         Some(mode) => match build_effect(&mode, &color, brightness, speed, &direction) {
             Ok(effect) => Some(effect),
@@ -130,6 +135,17 @@ fn run_save(args: Args) {
     if let Some(parent) = path.parent() {
         if let Err(err) = fs::create_dir_all(parent) {
             eprintln!("failed to create {}: {err}", parent.display());
+            std::process::exit(device::EXIT_FAILED);
+        }
+    }
+    // fs::write follows symlinks — if something with write access to
+    // the presets directory (a different process running as this same
+    // user, say) planted `<name>.json` as a symlink elsewhere, a
+    // routine `save` would silently overwrite whatever it points to.
+    // Confirmed by direct testing. Refuse rather than follow.
+    if let Ok(metadata) = fs::symlink_metadata(&path) {
+        if metadata.file_type().is_symlink() {
+            eprintln!("refusing to write through a symlink at {}", path.display());
             std::process::exit(device::EXIT_FAILED);
         }
     }
@@ -177,6 +193,10 @@ fn run_apply(args: Args) {
     let Action::Apply { name } = &args.action else {
         unreachable!("run_apply is only called for Action::Apply");
     };
+    if let Err(message) = validate_preset_name(name) {
+        eprintln!("{message}");
+        std::process::exit(device::EXIT_USAGE);
+    }
     let path = preset_path(name);
     let json = fs::read_to_string(&path).unwrap_or_else(|err| {
         eprintln!("failed to read preset {name:?} ({}): {err}", path.display());
@@ -220,6 +240,10 @@ fn run_delete(args: Args) {
     let Action::Delete { name } = &args.action else {
         unreachable!("run_delete is only called for Action::Delete");
     };
+    if let Err(message) = validate_preset_name(name) {
+        eprintln!("{message}");
+        std::process::exit(device::EXIT_USAGE);
+    }
     let path = preset_path(name);
     if let Err(err) = fs::remove_file(&path) {
         if err.kind() == std::io::ErrorKind::NotFound {
@@ -271,6 +295,56 @@ fn presets_dir() -> PathBuf {
     PathBuf::from(home).join(".config/opm/presets")
 }
 
+/// Rejects anything but a plain filename component — no `/` (or `\`,
+/// for anyone who copies this onto a platform where it'd matter),
+/// empty, and no `.`/`..`. Without this, `name` (a path traversal
+/// vector, e.g. `../../.bashrc` or an absolute `/etc/shadow`) would
+/// flow straight into [`preset_path`]'s `Path::join`, which honors
+/// both unchanged — confirmed by direct testing, not hypothetical.
+/// Every caller must validate before building a path from `name`.
+fn validate_preset_name(name: &str) -> Result<(), String> {
+    if name.is_empty() || name == "." || name == ".." || name.contains(['/', '\\']) {
+        return Err(format!(
+            "invalid preset name {name:?} — must be a plain name, no path separators"
+        ));
+    }
+    Ok(())
+}
+
 fn preset_path(name: &str) -> PathBuf {
     presets_dir().join(format!("{name}.json"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_names_are_accepted() {
+        assert!(validate_preset_name("gaming").is_ok());
+        assert!(validate_preset_name("my-preset_1").is_ok());
+    }
+
+    #[test]
+    fn rejects_path_separators() {
+        assert!(validate_preset_name("../../.bashrc").is_err());
+        assert!(validate_preset_name("sub/dir").is_err());
+        assert!(validate_preset_name("a\\b").is_err());
+    }
+
+    #[test]
+    fn rejects_absolute_paths() {
+        assert!(validate_preset_name("/etc/shadow").is_err());
+    }
+
+    #[test]
+    fn rejects_dot_and_dotdot() {
+        assert!(validate_preset_name(".").is_err());
+        assert!(validate_preset_name("..").is_err());
+    }
+
+    #[test]
+    fn rejects_empty() {
+        assert!(validate_preset_name("").is_err());
+    }
 }

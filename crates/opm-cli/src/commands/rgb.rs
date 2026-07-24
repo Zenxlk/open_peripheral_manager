@@ -98,7 +98,14 @@ fn act(opened: &dyn opm_core::device::Device, args: Args) -> Result<Option<Strin
 /// `--color` flag.
 pub(super) fn parse_hex_color(s: &str) -> Result<RgbColor, String> {
     let s = s.trim_start_matches('#');
-    if s.len() != 6 {
+    // `s.len()` is a byte count, not a char count — a 6-*byte* string
+    // can still contain a multi-byte UTF-8 character whose boundary
+    // falls inside one of the byte-index slices below (e.g. "aé1é" is
+    // 6 bytes but only 4 chars). Slicing at a non-char-boundary index
+    // panics; confirmed by direct testing, not hypothetical. Requiring
+    // ASCII first guarantees every subsequent byte index is a valid
+    // char boundary, since ASCII chars are always exactly 1 byte.
+    if s.len() != 6 || !s.is_ascii() {
         return Err("expected 6 hex digits, e.g. ff0000".to_owned());
     }
     let byte = |range: std::ops::Range<usize>| u8::from_str_radix(&s[range], 16);
@@ -107,4 +114,48 @@ pub(super) fn parse_hex_color(s: &str) -> Result<RgbColor, String> {
         g: byte(2..4).map_err(|err| err.to_string())?,
         b: byte(4..6).map_err(|err| err.to_string())?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_a_valid_color() {
+        assert_eq!(
+            parse_hex_color("ff0000"),
+            Ok(RgbColor {
+                r: 0xff,
+                g: 0,
+                b: 0
+            })
+        );
+        assert_eq!(
+            parse_hex_color("#7c5cff"),
+            Ok(RgbColor {
+                r: 0x7c,
+                g: 0x5c,
+                b: 0xff
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_wrong_length() {
+        assert!(parse_hex_color("fff").is_err());
+        assert!(parse_hex_color("ff00000").is_err());
+    }
+
+    #[test]
+    fn rejects_non_hex_ascii() {
+        assert!(parse_hex_color("zzzzzz").is_err());
+    }
+
+    #[test]
+    fn rejects_multibyte_utf8_without_panicking() {
+        // 6 *bytes*, but a multi-byte char straddles a slice boundary
+        // — this used to panic ("byte index 2 is not a char
+        // boundary"), confirmed by direct testing before the fix.
+        assert!(parse_hex_color("aé1é").is_err());
+    }
 }
