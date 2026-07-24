@@ -1,12 +1,6 @@
 # Maintainer: Zenxlk
-#
-# NOTE: pkgver/sha256sums must point at a release that actually
-# contains docs/protocols/ajazz-ak820/70-ak820-hidraw.rules and the
-# GROUP="opm" version of 99-ak820-usb.rules (ADR 0007) — v0.2.0
-# predates both. Update both together whenever RELEASING.md's process
-# cuts a new tag; see this repo's RELEASING.md "Arch packaging" section.
 pkgname=pmctl
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="Open Peripheral Manager — CLI for controlling supported HID peripherals (Ajazz AK820 lighting, sleep timer, host-side presets)"
 arch=('x86_64')
@@ -25,7 +19,7 @@ conflicts=('pmctl')
 options=('!lto')
 install="$pkgname.install"
 source=("$pkgname-$pkgver.tar.gz::https://github.com/Zenxlk/open_peripheral_manager/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('8fe6e1339a698830510b864c42583237326d08fbd646a8227760126c966af4d8')
+sha256sums=('11f53cc17d80a7c004a60f75079169c987fdecd609e4db0fd3ea291faae6298c')
 _srcdir="open_peripheral_manager-$pkgver"
 
 build() {
