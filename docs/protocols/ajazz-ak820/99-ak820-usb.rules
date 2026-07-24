@@ -7,10 +7,20 @@
 # just the hidraw one — a broader permission than the hidraw-only rule
 # from Phase 2 (see docs/architecture/transport.md's Findings).
 #
+# Uses a dedicated group, not `uaccess` — see ADR 0007
+# (docs/architecture/decisions/0007-udev-group-not-uaccess-for-libusbtransport-devices.md):
+# systemd-logind does not hand out a uaccess ACL for a raw USB device
+# node the kernel also recognizes as an input device (this one), even
+# though the tag itself is applied. Confirmed against real hardware.
+#
 # Install:
+#   sudo groupadd -f opm
 #   sudo cp 99-ak820-usb.rules /etc/udev/rules.d/
 #   sudo udevadm control --reload-rules
 #   sudo udevadm trigger
-# Then unplug and replug the keyboard (or reboot).
+#   sudo usermod -aG opm "$USER"
+# Then log out and back in (group membership only takes effect in new
+# sessions) — after that, no more `sudo` is needed for any `pmctl`
+# command that talks to the AK820.
 
-SUBSYSTEM=="usb", ATTR{idVendor}=="0c45", ATTR{idProduct}=="800a", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0c45", ATTR{idProduct}=="800a", MODE="0660", GROUP="opm"
