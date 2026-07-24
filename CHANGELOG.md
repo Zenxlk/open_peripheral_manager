@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-23
+
+Security fixes found during a self-review of everything implemented so
+far — no new features, no breaking changes.
+
+### Fixed
+
+- **Path traversal (CWE-22) in `pmctl preset save/apply/delete`**: the
+  `name` argument was used unsanitized to build a filesystem path — an
+  absolute path or `../` sequences escaped `~/.config/opm/presets/`
+  entirely. Confirmed by direct exploitation (arbitrary file
+  overwrite/delete within the invoking user's permissions — root-scoped
+  if run via the documented `sudo pmctl ...` fallback) before fixing.
+- **Panic (DoS) on malformed `--color` input**: a 6-*byte* string
+  containing a multi-byte UTF-8 character (e.g. `"aé1é"`) crashed
+  `parse_hex_color` by slicing at a non-char-boundary byte index.
+  Reachable with no hardware via `pmctl preset save`.
+- **Symlink following in `pmctl preset save`**: a pre-planted symlink
+  at the target preset path got silently written through. Lower
+  severity — needs prior write access to the presets directory.
+
+`cargo audit` run for the first time against this project: clean, no
+known vulnerabilities in any of the 47 dependencies.
+
 ## [0.3.0] - 2026-07-23
 
 Host-side presets, and the long-standing `sudo` requirement fixed for
