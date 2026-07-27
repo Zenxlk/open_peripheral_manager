@@ -141,22 +141,19 @@ dependencies = [
 
 [[package]]
 name = "hidreport"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2ea658c147ab3cf36313b696b49b7a58cc436ff3d9e6b48243d31cc19580647"
+checksum = "6bba4f2ebef8032ef0125a72c7052481c9d63e50f1d48d35c0933ae11aa58c6d"
 dependencies = [
  "hut",
- "thiserror",
+ "thiserror 2.0.19",
 ]
 
 [[package]]
 name = "hut"
-version = "0.3.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a6847b91daf99e3afce87a66f4c8e371776f4567e4e3f9ef48705baaca09795"
-dependencies = [
- "thiserror",
-]
+checksum = "c882ba3379c41a5713a111ea16bddf8d337c439630db6ec5f7ece7d1e7e29c5c"
 
 [[package]]
 name = "is_terminal_polyfill"
@@ -218,7 +215,7 @@ version = "0.3.1"
 dependencies = [
  "serde",
  "serde_json",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -228,7 +225,7 @@ dependencies = [
  "hidapi",
  "hidreport",
  "opm-core",
- "thiserror",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -365,7 +362,16 @@ version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.69",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09a43598840e33d5b0331f38c5e30d13bb11c11210a4b58f0d9b18a5a5eefcd9"
+dependencies = [
+ "thiserror-impl 2.0.19",
 ]
 
 [[package]]
@@ -377,6 +383,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.118",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43cbfe0cf76104d42a574802844187e84a305e531ed54455f11fbde0f10541cd"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
 ]
 
 [[package]]
